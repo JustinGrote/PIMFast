@@ -1,22 +1,116 @@
-import crxLogo from '@/assets/crx.svg'
-import reactLogo from '@/assets/react.svg'
-import viteLogo from '@/assets/vite.svg'
-import HelloWorld from '@/components/HelloWorld'
+import { useState, useEffect } from 'react'
 import './App.css'
+import { authenticateWithAzure } from './auth'
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Check for existing valid token on component mount
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      try {
+        const result = await chrome.storage.local.get(['azureToken', 'tokenExpiry'])
+        if (result.azureToken && result.tokenExpiry > Date.now()) {
+          setIsAuthenticated(true)
+        }
+      } catch (err) {
+        console.error('Error checking existing auth:', err)
+      }
+    }
+    checkExistingAuth()
+  }, [])
+
+
+  const handleAzureLogin = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { accessToken, refreshToken, expiresIn } = await authenticateWithAzure()
+      await chrome.storage.local.set({
+        azureToken: accessToken,
+        refreshToken: refreshToken,
+        tokenExpiry: Date.now() + (expiresIn * 1000)
+      })
+      setIsAuthenticated(true)
+      console.log('Successfully authenticated with Azure using authorization code flow + PKCE')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed')
+      console.error('Azure authentication error:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isAuthenticated) {
+    return (
+      <div className="login-container">
+        <div className="login-card">
+          <div className="success-icon">✓</div>
+          <h2>Authentication Successful</h2>
+          <p>You are now authenticated with Azure.</p>
+          <button
+            className="logout-button"
+            onClick={() => {
+              chrome.storage.local.remove(['azureToken', 'refreshToken', 'tokenExpiry'])
+              setIsAuthenticated(false)
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div>
-      <a href="https://vite.dev" target="_blank" rel="noreferrer">
-        <img src={viteLogo} className="logo" alt="Vite logo" />
-      </a>
-      <a href="https://reactjs.org/" target="_blank" rel="noreferrer">
-        <img src={reactLogo} className="logo react" alt="React logo" />
-      </a>
-      <a href="https://crxjs.dev/vite-plugin" target="_blank" rel="noreferrer">
-        <img src={crxLogo} className="logo crx" alt="crx logo" />
-      </a>
-      <HelloWorld msg="Vite + React + CRXJS" />
+    <div className="login-container">
+      <div className="login-card">
+        <div className="logo-section">
+          <h1>PIM Fast</h1>
+          <p>Azure Privileged Identity Management</p>
+        </div>
+
+        {error && (
+          <div className="error-message">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        <div className="login-section">
+          <p>Please authenticate with your Azure account to continue.</p>
+          <button
+            className={`azure-login-button ${isLoading ? 'loading' : ''}`}
+            onClick={handleAzureLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <div className="spinner"></div>
+                Authenticating...
+              </>
+            ) : (
+              <>
+                <svg className="microsoft-icon" viewBox="0 0 23 23" width="16" height="16">
+                  <path fill="#f35325" d="M0 0h11v11H0z"/>
+                  <path fill="#81bc06" d="M12 0h11v11H12z"/>
+                  <path fill="#05a6f0" d="M0 12h11v11H0z"/>
+                  <path fill="#ffba08" d="M12 12h11v11H12z"/>
+                </svg>
+                Authenticate with Azure
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="info-section">
+          <small>
+            This extension requires Azure Management API access to manage your PIM roles.
+          </small>
+        </div>
+      </div>
     </div>
   )
 }
