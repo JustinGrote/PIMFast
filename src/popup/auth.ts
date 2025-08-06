@@ -1,6 +1,6 @@
 import { PublicClientApplication, BrowserAuthOptions, AuthenticationResult, LogLevel, AccountInfo } from "@azure/msal-browser"
 import { AccessToken, TokenCredential } from "@azure/identity"
-import { AuthorizationManagementClient, RoleAssignmentSchedule } from "@azure/arm-authorization";
+import { AuthorizationManagementClient } from "@azure/arm-authorization";
 import { SubscriptionClient } from '@azure/arm-subscriptions';
 
 
@@ -142,7 +142,7 @@ export async function* getRoleEligibilitySchedules(account: AccountInfo) {
 		const roleScheduleIterators = []
 		for (const sub of subscriptionList) {
 			const scope = `subscriptions/${sub.subscriptionId}`;
-			roleScheduleIterators.push(pimClient.roleAssignmentSchedules.listForScope(scope, { filter: 'asTarget()' }))
+			roleScheduleIterators.push(pimClient.roleAssignmentScheduleInstances.listForScope(scope, { filter: 'asTarget()' }))
 		}
 
 		for await (const iterator of roleScheduleIterators) {

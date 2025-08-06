@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { logout, getAllAccounts, getRoleEligibilitySchedules } from './auth'
 import { AccountInfo } from '@azure/msal-browser'
+import { RoleAssignmentSchedule, RoleAssignmentScheduleInstance } from '@azure/arm-authorization';
 
 interface PimGridProps {
   onSignOut: () => void
@@ -9,8 +10,9 @@ interface PimGridProps {
 export default function PimGrid({ onSignOut }: PimGridProps) {
   const [accounts, setAccounts] = useState<AccountInfo[]>([])
   const [signingInAccount, setSigningInAccount] = useState<string | null>(null)
-  const [roleSchedules, setRoleSchedules] = useState<any[]>([])
+  const [roleSchedules, setRoleSchedules] = useState<RoleAssignmentSchedule[]>([])
   const [loadingRoles, setLoadingRoles] = useState(false)
+  const [checkedRows, setCheckedRows] = useState<{ [key: number]: boolean }>({})
 
   const loadAccounts = async () => {
     const allAccounts = await getAllAccounts()
@@ -21,15 +23,11 @@ export default function PimGrid({ onSignOut }: PimGridProps) {
     setLoadingRoles(true)
     try {
       const allAccounts = await getAllAccounts()
-      const allRoleSchedules = []
+      const allRoleSchedules: RoleAssignmentScheduleInstance[] = []
 
       for (const account of allAccounts) {
-        const schedules = await getRoleEligibilitySchedules(account)
-        for await (const schedule of schedules) {
-          allRoleSchedules.push({
-            accountUsername: account.username,
-            ...schedule,
-          })
+        for await (const schedule of getRoleEligibilitySchedules(account)) {
+          allRoleSchedules.push(schedule)
         }
       }
 
@@ -127,8 +125,8 @@ export default function PimGrid({ onSignOut }: PimGridProps) {
       </div>
 
       {/* Role Eligibility Schedules Grid - always below the accounts card */}
-      <div className="login-card" style={{ marginTop: '1rem' }}>
-        <h2>Role Eligibility Schedules</h2>
+      <div className="role-schedules" style={{ marginTop: '2rem' }}>
+        <h2>Eligible Roles</h2>
         {loadingRoles ? (
           <div className="loading-container">
             <div className="spinner"></div>
@@ -138,9 +136,10 @@ export default function PimGrid({ onSignOut }: PimGridProps) {
           <table className="accounts-table">
             <thead>
               <tr>
-                <th>Account</th>
-                <th>Subscription</th>
-                <th>Role Definition</th>
+                <th></th> {/* New checkbox column */}
+                <th>ID</th>
+                <th>Type</th>
+                <th>Role</th>
                 <th>Scope</th>
                 <th>Status</th>
                 <th>Start Time</th>
@@ -150,17 +149,44 @@ export default function PimGrid({ onSignOut }: PimGridProps) {
             <tbody>
               {roleSchedules.map((schedule, index) => (
                 <tr key={index}>
-                  <td>{schedule.accountUsername}</td>
-                  <td>{schedule.subscriptionName}</td>
-                  <td>{schedule.properties?.expandedProperties?.roleDefinition?.displayName || schedule.properties?.roleDefinitionDisplayName || 'N/A'}</td>
-                  <td>{schedule.properties?.expandedProperties?.scope?.displayName || schedule.properties?.scopeDisplayName || schedule.properties?.scope || 'N/A'}</td>
                   <td>
-                    <span className={`status-badge ${schedule.properties?.status?.toLowerCase() || 'unknown'}`}>
-                      {schedule.properties?.status || 'Unknown'}
-                    </span>
+                    <input
+                      type="checkbox"
+                      checked={!!checkedRows[index]}
+                      onChange={() =>
+                        setCheckedRows(prev => ({
+                          ...prev,
+                          [index]: !prev[index]
+                        }))
+                      }
+                    />
+                    <button
+                      style={{ marginLeft: 4 }}
+                      type="button"
+                      onClick={() => {/* TODO: handle activation logic here */}}
+                    >
+                      Activate
+                    </button>
                   </td>
-                  <td>{schedule.properties?.startDateTime ? new Date(schedule.properties.startDateTime).toLocaleDateString() : 'N/A'}</td>
-                  <td>{schedule.properties?.endDateTime ? new Date(schedule.properties.endDateTime).toLocaleDateString() : 'N/A'}</td>
+                  <td>{schedule.name}</td>
+                  <td>{schedule.assignmentType}</td>
+                  <td>{schedule.roleDefinitionId}</td>
+                  <td>{schedule.scope || 'N/A'}</td>
+                  <td>{schedule.status || 'N/A'}</td>
+                  <td>
+                    {schedule.startDateTime
+                      ? schedule.startDateTime instanceof Date
+                        ? schedule.startDateTime.toLocaleString()
+                        : String(schedule.startDateTime)
+                      : 'N/A'}
+                  </td>
+                  <td>
+                    {schedule.endDateTime
+                      ? schedule.endDateTime instanceof Date
+                        ? schedule.endDateTime.toLocaleString()
+                        : String(schedule.endDateTime)
+                      : 'N/A'}
+                  </td>
                 </tr>
               ))}
             </tbody>
