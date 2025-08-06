@@ -1,107 +1,174 @@
-// Azure authentication logic with PKCE for Chrome Extensions
+import { PublicClientApplication, BrowserAuthOptions, AuthenticationResult, LogLevel, AccountInfo } from "@azure/msal-browser"
+import { AccessToken, TokenCredential } from "@azure/identity"
+import { AuthorizationManagementClient, RoleAssignmentSchedule } from "@azure/arm-authorization";
+import { SubscriptionClient } from '@azure/arm-subscriptions';
 
-export async function authenticateWithAzure(): Promise<{ accessToken: string, refreshToken: string, expiresIn: number }> {
-  const client_id = '980df394-42ba-4a2c-919c-3e7609f3dbd1'
-  const redirectUri = chrome.identity.getRedirectURL()
 
-  // PKCE helpers
-  function base64UrlEncode(arrayBuffer: ArrayBuffer): string {
-    let binary = ''
-    const bytes = new Uint8Array(arrayBuffer)
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    return btoa(binary)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '')
-  }
+const redirectUri = chrome.identity.getRedirectURL();
 
-  async function generateCodeChallenge(codeVerifier: string): Promise<string> {
-    const encoder = new TextEncoder()
-    const data = encoder.encode(codeVerifier)
-    const digest = await window.crypto.subtle.digest('SHA-256', data)
-    return base64UrlEncode(digest)
-  }
+// Only one interactive is allowed at a time. We store the interactive here so that it can be awaited as a semaphore
+const msalChromeExtensionAuthOptions: BrowserAuthOptions = {
+	clientId: "980df394-42ba-4a2c-919c-3e7609f3dbd1",
+	redirectUri,
+	postLogoutRedirectUri: redirectUri,
+	onRedirectNavigate(url) {
+		launchChromeWebAuthFlow(url)
+			.then(msalInstance.handleRedirectPromise.bind(msalInstance))
+			.catch(err => {
+				console.error("Error handling redirect:", err)
+			});
+	},
+}
 
-  function generateCodeVerifier(length = 64): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'
-    let verifier = ''
-    const randomValues = new Uint8Array(length)
-    window.crypto.getRandomValues(randomValues)
-    for (let i = 0; i < length; i++) {
-      verifier += chars.charAt(randomValues[i] % chars.length)
-    }
-    return verifier
-  }
+console.log(`Reminder: Azure App Registration with Client ID ${msalChromeExtensionAuthOptions.clientId} needs to have the following redirect and logout URI configured: ${msalChromeExtensionAuthOptions.redirectUri}`);
 
-  // PKCE: generate code verifier and challenge
-  const codeVerifier: string = generateCodeVerifier(64)
-  const codeChallenge: string = await generateCodeChallenge(codeVerifier)
+const msalInstance = new PublicClientApplication({
+	auth: msalChromeExtensionAuthOptions,
+	system: {
+		loggerOptions: {
+			loggerCallback: (level, message, _) => {
+				console.log(`[MSAL] ${level}: ${message}`)
+			},
+			logLevel: LogLevel.Trace,
+			piiLoggingEnabled: true
+		}
+	},
+	cache: {
+		cacheLocation: "localStorage"
+	}
+})
 
-  // Azure Authorization Code Flow with PKCE - Step 1: Get authorization code
-  const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
-    `client_id=${client_id}&` +
-    `response_type=code&` +
-    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-    `scope=${encodeURIComponent('https://management.azure.com/.default offline_access')}&` +
-    `response_mode=query&` +
-    `state=${encodeURIComponent(crypto.randomUUID())}&` +
-    `code_challenge=${codeChallenge}&` +
-    `code_challenge_method=S256`
+await msalInstance.initialize()
 
-  const responseUrl = await chrome.identity.launchWebAuthFlow({
-    url: authUrl,
-    interactive: true
-  })
+export async function checkIfAuthenticated() {
+	await msalInstance.handleRedirectPromise()
+	const currentAccount = msalInstance.getActiveAccount()
+	const allAccounts = msalInstance.getAllAccounts()
+	return !!(currentAccount || allAccounts.length > 0)
+}
 
-  if (!responseUrl) {
-    throw new Error('Authentication was cancelled or failed')
-  }
+export async function getChromeExtensionAzureToken() {
+	await checkIfAuthenticated()
+	console.log("LastAuthCode: " + window.localStorage.getItem("lastAuthCode"))
 
-  // Extract authorization code from the URL query parameters
-  const url = new URL(responseUrl)
-  const authCode = url.searchParams.get('code')
-  const error = url.searchParams.get('error')
-  const error_description = url.searchParams.get('error_description')
+	const currentAccount = msalInstance.getActiveAccount()
+	const allAccounts = msalInstance.getAllAccounts()
 
-  if (error) {
-    throw new Error(`Authentication error: ${error} - ${error_description}`)
-  }
+	if (currentAccount || allAccounts.length > 0) {
+		const activeAccount = currentAccount || allAccounts[0]
+		console.log("Using existing account:", activeAccount)
+		return msalInstance.acquireTokenSilent({
+			scopes: ["https://management.azure.com/.default", "offline_access"],
+			account: activeAccount
+		});
+	}
 
-  if (!authCode) {
-    throw new Error('No authorization code received')
-  }
+	return new Promise<AuthenticationResult>((resolve, reject) => {
+		msalInstance.acquireTokenRedirect({
+			scopes: ["https://management.azure.com/.default", "offline_access"],
+			onRedirectNavigate: (url) => {
+				launchChromeWebAuthFlow(url)
+					.then(authcode => {
+						window.localStorage.setItem('lastAuthCode', authcode) // Store the auth code for debug
+						return authcode
+					})
+					.then(msalInstance.handleRedirectPromise.bind(msalInstance))
+					.then(result => {
+						if (!result || !result.account) {
+							return false
+						}
 
-  // Step 2: Exchange authorization code for access token (with PKCE)
-  const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: client_id,
-      scope: 'https://management.azure.com/.default offline_access',
-      code: authCode,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-      code_verifier: codeVerifier,
-    }),
-  })
+						resolve(result)
+						return true
+					})
+					.catch(reject)
+			}
+		})
+	})
+}
 
-  if (!tokenResponse.ok) {
-    const errorData = await tokenResponse.json()
-    throw new Error(`Token exchange failed: ${errorData.error_description || errorData.error}`)
-  }
+export async function logout(account?: AccountInfo) {
+	if (account) {
+		await msalInstance.logoutRedirect({
+			account: account
+		})
+	} else {
+		await msalInstance.logoutRedirect()
+	}
+}
 
-  const tokenData = await tokenResponse.json()
-  const accessToken = tokenData.access_token
-  const refreshToken = tokenData.refresh_token
-  const expiresIn = tokenData.expires_in
+export async function getAllAccounts(): Promise<AccountInfo[]> {
+	return msalInstance.getAllAccounts() ?? []
+}
 
-  if (!accessToken) {
-    throw new Error('No access token received from token exchange')
-  }
+class AccountInfoTokenCredential implements TokenCredential {
+	account: AccountInfo;
 
-  return { accessToken, refreshToken, expiresIn }
+	constructor(account: AccountInfo) {
+		this.account = account;
+	}
+
+	async getToken(scopes: string | string[]): Promise<AccessToken | null> {
+		const msalToken = await msalInstance.acquireTokenSilent({
+			scopes: Array.isArray(scopes) ? scopes : [scopes],
+			account: this.account
+		})
+		return {
+			tokenType: "Bearer",
+			token: msalToken.accessToken,
+			expiresOnTimestamp: msalToken.expiresOn?.getTime()
+				?? Date.now() + 3600 * 1000 // Default to 1 hour if not set
+		}
+	}
+}
+
+export async function* getRoleEligibilitySchedules(account: AccountInfo) {
+	try {
+		const credential = new AccountInfoTokenCredential(account)
+
+		const subClient = new SubscriptionClient(credential);
+
+		const unspecifiedSubscriptionId = '00000000-0000-0000-0000-000000000000'
+		const pimClient = new AuthorizationManagementClient(credential, unspecifiedSubscriptionId);
+
+		const subscriptionList = [];
+		let count = 0;
+		for await (const sub of subClient.subscriptions.list()) {
+			subscriptionList.push(sub);
+			count++;
+			if (count >= 2) break;
+		}
+
+		const roleScheduleIterators = []
+		for (const sub of subscriptionList) {
+			const scope = `subscriptions/${sub.subscriptionId}`;
+			roleScheduleIterators.push(pimClient.roleAssignmentSchedules.listForScope(scope, { filter: 'asTarget()' }))
+		}
+
+		for await (const iterator of roleScheduleIterators) {
+			for await (const roleSchedule of iterator) {
+				console.debug(`Fetched Role Schedule: ${roleSchedule.scope} [${roleSchedule.name}]`);
+				yield roleSchedule;
+			}
+		}
+	} catch (err) {
+		console.error("Error in getRoleEligibilitySchedules:", err);
+	}
+}
+
+async function launchChromeWebAuthFlow(url: string) {
+	const responseUrl = await chrome.identity.launchWebAuthFlow({
+		url: url,
+		interactive: true
+	})
+
+	if (!responseUrl) {
+		throw new Error("WebAuthFlow failed to return a response URL.");
+	}
+
+		// Response urls includes a hash (login, acquire token calls)
+	if (!responseUrl.includes("#")) {
+		throw new Error("WebAuthFlow response URL does not contain a hash, indicating it was not a login or acquire token call.");
+	}
+	return `#${responseUrl.split("#")[1]}`
 }

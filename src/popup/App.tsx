@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import { authenticateWithAzure } from './auth'
+import { getChromeExtensionAzureToken, checkIfAuthenticated } from './auth'
+import PimGrid from './PimGrid'
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(false)
@@ -10,32 +11,21 @@ export default function App() {
   // Check for existing valid token on component mount
   useEffect(() => {
     const checkExistingAuth = async () => {
-      try {
-        const result = await chrome.storage.local.get(['azureToken', 'tokenExpiry'])
-        if (result.azureToken && result.tokenExpiry > Date.now()) {
-          setIsAuthenticated(true)
-        }
-      } catch (err) {
-        console.error('Error checking existing auth:', err)
-      }
+      setIsAuthenticated(
+        await checkIfAuthenticated()
+      )
     }
     checkExistingAuth()
   }, [])
-
 
   const handleAzureLogin = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const { accessToken, refreshToken, expiresIn } = await authenticateWithAzure()
-      await chrome.storage.local.set({
-        azureToken: accessToken,
-        refreshToken: refreshToken,
-        tokenExpiry: Date.now() + (expiresIn * 1000)
-      })
+      const authResult = await getChromeExtensionAzureToken()
+      console.log('Authentication Result:', authResult)
       setIsAuthenticated(true)
-      console.log('Successfully authenticated with Azure using authorization code flow + PKCE')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
       console.error('Azure authentication error:', err)
@@ -45,24 +35,7 @@ export default function App() {
   }
 
   if (isAuthenticated) {
-    return (
-      <div className="login-container">
-        <div className="login-card">
-          <div className="success-icon">✓</div>
-          <h2>Authentication Successful</h2>
-          <p>You are now authenticated with Azure.</p>
-          <button
-            className="logout-button"
-            onClick={() => {
-              chrome.storage.local.remove(['azureToken', 'refreshToken', 'tokenExpiry'])
-              setIsAuthenticated(false)
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-    )
+    return <PimGrid onSignOut={() => setIsAuthenticated(false)} />
   }
 
   return (

@@ -1,5 +1,6 @@
 {
   "name": "justingrote.pimfast",
+  "title": "PIM Fast",
   "type": "module",
   "version": "1.0.0",
   "private": true,
@@ -9,6 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azure/arm-authorization": "^9.0.0",
+    "@azure/arm-subscriptions": "^5.1.0",
+    "@azure/identity": "^4.11.1",
+    "@azure/msal-browser": "^3.30.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
