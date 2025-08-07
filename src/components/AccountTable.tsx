@@ -1,6 +1,9 @@
 import { getAllAccounts, logout } from '@/common/auth';
 import { AccountInfo } from '@azure/msal-browser'
 import { useEffect, useState } from 'react'
+import { ActionIcon, Text, Group, Tooltip } from '@mantine/core';
+import { IconX } from '@tabler/icons-react';
+import { DataTable } from 'mantine-datatable';
 
 interface AccountTableProps {
   onNoAccounts?: () => void;
@@ -20,38 +23,7 @@ export default function AccountTable({ onNoAccounts }: AccountTableProps) {
     fetchAccounts()
   }, [onNoAccounts])
 
-  return (
-    <table className="accounts-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Username</th>
-          <th>Tenant ID</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {accounts.map((account, index) => (
-          <tr key={index}>
-            <td>{account.name || 'N/A'}</td>
-            <td>{account.username}</td>
-            <td>{account.tenantId}</td>
-            <td>
-              <button
-                className="sign-out-button"
-                onClick={async () => handleSignOutAccount(account)}
-                title="Sign out this account"
-              >❌</button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-
   async function handleSignOutAccount(account: AccountInfo) {
-    // This function should handle the sign-out logic for the specific account
-    // For example, it could call a logout function from the auth module
     console.log(`Signing out account: ${account.username}`)
     await logout(account)
     // Optionally, refresh the accounts list after sign out
@@ -61,5 +33,49 @@ export default function AccountTable({ onNoAccounts }: AccountTableProps) {
       onNoAccounts()
     }
   }
+
+  return (
+    <DataTable
+      withTableBorder
+      borderRadius="sm"
+      withColumnBorders
+      striped
+      highlightOnHover
+      records={accounts}
+      columns={[
+        {
+          accessor: 'name',
+          title: 'Name',
+          render: (account: AccountInfo) => <Text>{account.name || 'N/A'}</Text>
+        },
+        {
+          accessor: 'username',
+          title: 'Username',
+        },
+        {
+          accessor: 'tenantId',
+          title: 'Tenant ID',
+        },
+        {
+          accessor: 'actions',
+          title: '',
+          textAlign: 'right',
+          render: (account: AccountInfo) => (
+            <Group gap="xs" justify="flex-end">
+              <Tooltip label="Sign out">
+                <ActionIcon
+                  color="red"
+                  variant="subtle"
+                  onClick={() => handleSignOutAccount(account)}
+                >
+                  <IconX size={16} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          ),
+        },
+      ]}
+    />
+  )
 }
 

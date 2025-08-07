@@ -2,16 +2,24 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import { getChromeExtensionAzureToken, checkIfAuthenticated } from '../common/auth'
 import AccountTable from '@/components/AccountTable';
+import {
+  Container,
+  Card,
+  Title,
+  Text,
+  Button,
+  Stack,
+  Group,
+  Alert,
+  Loader
+} from '@mantine/core';
+import { IconAlertCircle, IconBrandAzure } from '@tabler/icons-react';
 
 function openSidebar() {
-  if (window.chrome?.sidePanel) {
-    window.chrome.sidePanel.open({ windowId: window.chrome.windows.WINDOW_ID_CURRENT });
-  } else if (window.chrome?.runtime?.sendMessage) {
-    // fallback for manifest v2 or custom sidebar logic
-    window.chrome.runtime.sendMessage({ action: 'openSidePanel' });
-  } else {
+  if (!window.chrome?.sidePanel) {
     alert('Sidebar API not available in this browser.');
   }
+  window.chrome.sidePanel.open({ windowId: window.chrome.windows.WINDOW_ID_CURRENT });
 }
 
 export default function App() {
@@ -45,71 +53,65 @@ export default function App() {
   }
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <div className="logo-section">
-          <h1>PIM Fast</h1>
-          <p>Azure Privileged Identity Management</p>
-        </div>
+    <Container size="sm" py="md">
+      <Card shadow="sm" p="lg" radius="md" withBorder>
+        <Stack>
+          <Group justify="center">
+            <Title order={1}>PIM Fast</Title>
+          </Group>
+          <Text c="dimmed" size="sm" ta="center">Azure Privileged Identity Management</Text>
 
-        {error && (
-          <div className="error-message">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
-
-        {isAuthenticated ? (
-          <>
-            <AccountTable onNoAccounts={() => {
-              setIsAuthenticated(false);
-              setError(null);
-            }} />
-            <button
-              className="azure-login-button"
-              style={{ marginTop: 16, width: '100%' }}
-              onClick={openSidebar}
+          {error && (
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              title="Authentication Error"
+              color="red"
+              variant="filled"
             >
-              Open Sidebar
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="login-section">
-              <p>Please authenticate with your Azure account to continue.</p>
-              <button
-                className={`azure-login-button ${isLoading ? 'loading' : ''}`}
+              {error}
+            </Alert>
+          )}
+
+          {isAuthenticated ? (
+            <Stack>
+              <AccountTable onNoAccounts={() => {
+                setIsAuthenticated(false);
+                setError(null);
+              }} />
+              <Button
+                onClick={openSidebar}
+                variant="filled"
+                color="blue"
+              >
+                Open Sidebar
+              </Button>
+            </Stack>
+          ) : (
+            <Stack>
+              <Text>Please authenticate with your Azure account to continue.</Text>
+              <Button
+                leftSection={<IconBrandAzure size={16} />}
                 onClick={handleAzureLogin}
                 disabled={isLoading}
+                variant="filled"
+                color="blue"
               >
                 {isLoading ? (
-                  <>
-                    <div className="spinner"></div>
-                    Authenticating...
-                  </>
+                  <Group gap="xs">
+                    <Loader color="white" size="xs" />
+                    <span>Authenticating...</span>
+                  </Group>
                 ) : (
-                  <>
-                    <svg className="microsoft-icon" viewBox="0 0 23 23" width="16" height="16">
-                      <path fill="#f35325" d="M0 0h11v11H0z"/>
-                      <path fill="#81bc06" d="M12 0h11v11H12z"/>
-                      <path fill="#05a6f0" d="M0 12h11v11H0z"/>
-                      <path fill="#ffba08" d="M12 12h11v11H12z"/>
-                    </svg>
-                    Authenticate with Azure
-                  </>
+                  "Authenticate with Azure"
                 )}
-              </button>
-            </div>
-
-            <div className="info-section">
-              <small>
+              </Button>
+              <Text size="xs" c="dimmed">
                 This extension requires Azure Management API access to manage your PIM roles.
-              </small>
-            </div>
-          </>
-        )}
-
-      </div>
-    </div>
+              </Text>
+            </Stack>
+          )}
+        </Stack>
+      </Card>
+    </Container>
   )
 }

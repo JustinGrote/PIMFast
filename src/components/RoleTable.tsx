@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
 import { RoleAssignmentScheduleInstance } from '@azure/arm-authorization';
+import { Button, Checkbox, Group, Loader, Paper, Stack, Text, Title, ThemeIcon } from '@mantine/core';
+import { IconPlayerPlay, IconRefresh, IconHierarchy3, IconBuildingBank, IconQuestionMark } from '@tabler/icons-react';
+import { DataTable } from 'mantine-datatable';
+import React, { useEffect, useState } from 'react';
 import { getAllAccounts } from '../common/auth';
 import { getRoleEligibilitySchedules } from '../common/pim';
+import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 
 interface RoleTableProps {
   onRefresh?: () => void;
@@ -35,72 +39,108 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
   }, [onRefresh]);
 
   return (
-    <div className="role-schedules" style={{ marginTop: '2rem' }}>
-      <h2>Eligible Roles</h2>
-      {loadingRoles ? (
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Loading role schedules...</p>
-        </div>
-      ) : roleSchedules.length > 0 ? (
-        <table className="accounts-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Role</th>
-              <th>Scope</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {roleSchedules.map((schedule, index) => (
-              <tr key={index}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={!!checkedRows[index]}
-                    onChange={() =>
-                      setCheckedRows(prev => ({
-                        ...prev,
-                        [index]: !prev[index]
-                      }))
-                    }
-                  />
-                  <button
-                    style={{
-                      marginLeft: 4,
-                      height: 'auto',
-                      padding: '0.25em 0.75em',
-                      fontSize: 'inherit',
-                      lineHeight: 'inherit',
-                      verticalAlign: 'middle'
-                    }}
-                    type="button"
-                    onClick={() => {/* TODO: handle activation logic here */}}
-                  >
-                    Activate
-                  </button>
-                </td>
-                <td title={schedule.roleDefinitionId}>
-                  {schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}</td>
-                <td title={schedule.scope ?? ''}>
-                  {schedule.expandedProperties?.scope?.displayName ?? 'unknown'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p>No role eligibility schedules found.</p>
-      )}
-      <button
-        className="refresh-button"
-        onClick={fetchRoleSchedules}
-        disabled={loadingRoles}
-      >
-        {loadingRoles ? 'Refreshing...' : 'Refresh Roles'}
-      </button>
-    </div>
+    <Paper shadow="xs" p="md" mt="xl">
+      <Stack>
+        <Group justify="space-between" align="center">
+          <Title order={2}>Eligible Roles</Title>
+          <Button
+            onClick={fetchRoleSchedules}
+            disabled={loadingRoles}
+            variant="subtle"
+            size="compact-icon"
+          >
+            <IconRefresh />
+          </Button>
+        </Group>
+
+        {loadingRoles
+          ? (
+            <Group justify="center" p="xl">
+              <Loader size="md" />
+              <Text>Loading role schedules...</Text>
+            </Group>
+          )
+          : roleSchedules.length > 0 ? (
+          <DataTable
+            withTableBorder
+            borderRadius="xs"
+            withColumnBorders
+            striped
+            highlightOnHover
+            records={roleSchedules}
+            columns={[
+              {
+                accessor: 'actions',
+                title: '',
+                width: '80',
+                render: (schedule: RoleAssignmentScheduleInstance, index: number) => (
+                  <Group gap="xs">
+                    <Checkbox
+                      checked={!!checkedRows[index]}
+                      onChange={() =>
+                        setCheckedRows(prev => ({
+                          ...prev,
+                          [index]: !prev[index]
+                        }))
+                      }
+                    />
+                    <Button variant="subtle" color="green" size="xs">
+                      <IconPlayerPlay />
+                    </Button>
+                  </Group>
+                ),
+              },
+              {
+                accessor: 'roleDefinition',
+                title: 'Role',
+                render: (schedule: RoleAssignmentScheduleInstance) => (
+                  <Text title={schedule.roleDefinitionId || ''}>
+                    {schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
+                  </Text>
+                ),
+              },
+              {
+                accessor: 'scope',
+                title: 'Scope',
+                render: (schedule: RoleAssignmentScheduleInstance) => {
+                  const type = schedule.expandedProperties?.scope?.type;
+                  let icon = null;
+                  if (type === 'resourcegroup') {
+                    icon = (
+                      <ThemeIcon variant="light" size="sm" color="blue">
+                        <ResourceGroups />
+                      </ThemeIcon>
+                    );
+                  } else if (type === 'subscription') {
+                    icon = (
+                      <Subscriptions />
+                    );
+                  } else if (type === 'managementgroup') {
+                    icon = (
+                      <ManagementGroups />
+                    );
+                  } else {
+                    icon = (
+                      <IconQuestionMark />
+                    );
+                  }
+                  return (
+                    <Group gap={4}>
+                      {icon}
+                      <Text title={schedule.scope ?? ''}>
+                        {schedule.expandedProperties?.scope?.displayName ?? 'unknown'}
+                      </Text>
+                    </Group>
+                  );
+                },
+              },
+            ]}
+          />
+        ) : (
+          <Text>No role eligibility schedules found.</Text>
+        )}
+      </Stack>
+    </Paper>
   );
 };
 
