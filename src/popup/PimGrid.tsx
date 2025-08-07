@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { logout, getAllAccounts, getRoleEligibilitySchedules } from '../common/auth'
 import { AccountInfo } from '@azure/msal-browser'
 import { RoleAssignmentSchedule, RoleAssignmentScheduleInstance } from '@azure/arm-authorization';
-import RoleTable from '../components/RoleTable';
 import AccountTable from '../components/AccountTable';
 
 interface PimGridProps {
@@ -12,9 +11,6 @@ interface PimGridProps {
 export default function PimGrid({ onSignOut }: PimGridProps) {
   const [accounts, setAccounts] = useState<AccountInfo[]>([])
   const [signingInAccount, setSigningInAccount] = useState<string | null>(null)
-  const [roleSchedules, setRoleSchedules] = useState<RoleAssignmentSchedule[]>([])
-  const [loadingRoles, setLoadingRoles] = useState(false)
-  const [checkedRows, setCheckedRows] = useState<{ [key: number]: boolean }>({})
 
   const loadAccounts = async () => {
     const allAccounts = await getAllAccounts()
