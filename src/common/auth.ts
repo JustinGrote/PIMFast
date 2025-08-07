@@ -64,37 +64,41 @@ export async function getChromeExtensionAzureToken() {
 	}
 
 	return new Promise<AuthenticationResult>((resolve, reject) => {
-		msalInstance.acquireTokenRedirect({
-			scopes: ["https://management.azure.com/.default", "offline_access"],
-			onRedirectNavigate: (url) => {
-				launchChromeWebAuthFlow(url)
-					.then(authcode => {
-						window.localStorage.setItem('lastAuthCode', authcode) // Store the auth code for debug
-						return authcode
-					})
-					.then(msalInstance.handleRedirectPromise.bind(msalInstance))
-					.then(result => {
-						if (!result || !result.account) {
-							return false
-						}
+		msalInstance.handleRedirectPromise().then(() => {
+			msalInstance.acquireTokenRedirect({
+				scopes: ["https://management.azure.com/.default", "offline_access"],
+				onRedirectNavigate: (url) => {
+					launchChromeWebAuthFlow(url)
+						.then(authcode => {
+							window.localStorage.setItem('lastAuthCode', authcode) // Store the auth code for debug
+							return authcode
+						})
+						.then(msalInstance.handleRedirectPromise.bind(msalInstance))
+						.then(result => {
+							if (!result || !result.account) {
+								return false
+							}
 
-						resolve(result)
-						return true
-					})
-					.catch(reject)
-			}
+							resolve(result)
+							return true
+						})
+						.catch(reject)
+				}
+			})
 		})
 	})
 }
 
 export async function logout(account?: AccountInfo) {
 	if (account) {
-		await msalInstance.logoutRedirect({
+		msalInstance.logoutRedirect({
 			account: account
 		})
 	} else {
-		await msalInstance.logoutRedirect()
+		msalInstance.logoutRedirect()
 	}
+	// This is necessary to ensure the logout completes and the cache is cleared
+	return await msalInstance.handleRedirectPromise()
 }
 
 export async function getAllAccounts(): Promise<AccountInfo[]> {
