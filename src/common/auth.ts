@@ -1,8 +1,5 @@
 import { PublicClientApplication, BrowserAuthOptions, AuthenticationResult, LogLevel, AccountInfo } from "@azure/msal-browser"
 import { AccessToken, TokenCredential } from "@azure/identity"
-import { AuthorizationManagementClient } from "@azure/arm-authorization";
-import { SubscriptionClient } from '@azure/arm-subscriptions';
-
 
 const redirectUri = chrome.identity.getRedirectURL();
 
@@ -105,7 +102,8 @@ export async function getAllAccounts(): Promise<AccountInfo[]> {
 	return msalInstance.getAllAccounts() ?? []
 }
 
-class AccountInfoTokenCredential implements TokenCredential {
+/** A TokenCredential bridge between MSAL.js and the Azure SDK */
+export class AccountInfoTokenCredential implements TokenCredential {
 	account: AccountInfo;
 
 	constructor(account: AccountInfo) {
@@ -123,40 +121,6 @@ class AccountInfoTokenCredential implements TokenCredential {
 			expiresOnTimestamp: msalToken.expiresOn?.getTime()
 				?? Date.now() + 3600 * 1000 // Default to 1 hour if not set
 		}
-	}
-}
-
-export async function* getRoleEligibilitySchedules(account: AccountInfo) {
-	try {
-		const credential = new AccountInfoTokenCredential(account)
-
-		const subClient = new SubscriptionClient(credential);
-
-		const unspecifiedSubscriptionId = '00000000-0000-0000-0000-000000000000'
-		const pimClient = new AuthorizationManagementClient(credential, unspecifiedSubscriptionId);
-
-		const subscriptionList = [];
-		let count = 0;
-		for await (const sub of subClient.subscriptions.list()) {
-			subscriptionList.push(sub);
-			count++;
-			if (count >= 2) break;
-		}
-
-		const roleScheduleIterators = []
-		for (const sub of subscriptionList) {
-			const scope = `subscriptions/${sub.subscriptionId}`;
-			roleScheduleIterators.push(pimClient.roleAssignmentScheduleInstances.listForScope(scope, { filter: 'asTarget()' }))
-		}
-
-		for await (const iterator of roleScheduleIterators) {
-			for await (const roleSchedule of iterator) {
-				console.debug(`Fetched Role Schedule: ${roleSchedule.scope} [${roleSchedule.name}]`);
-				yield roleSchedule;
-			}
-		}
-	} catch (err) {
-		console.error("Error in getRoleEligibilitySchedules:", err);
 	}
 }
 

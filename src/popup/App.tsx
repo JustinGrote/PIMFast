@@ -113,16 +113,3 @@ export default function App() {
     </div>
   )
 }
-
-// Keyboard shortcut: Ctrl+Shift+Y to open sidebar
-// This must be outside the return/JSX
-useEffect(() => {
-  function handleKeyDown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'y') {
-      e.preventDefault();
-      openSidebar();
-    }
-  }
-  window.addEventListener('keydown', handleKeyDown);
-  return () => window.removeEventListener('keydown', handleKeyDown);
-}, []);

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { RoleAssignmentScheduleInstance } from '@azure/arm-authorization';
-import { getRoleEligibilitySchedules, getAllAccounts } from '../common/auth';
+import { getAllAccounts } from '../common/auth';
+import { getRoleEligibilitySchedules } from '../common/pim';
 
 interface RoleTableProps {
   onRefresh?: () => void;
 }
-
 
 const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
   const [loadingRoles, setLoadingRoles] = useState(false);
@@ -47,13 +47,9 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
           <thead>
             <tr>
               <th></th>
-              <th>ID</th>
-              <th>Type</th>
               <th>Role</th>
               <th>Scope</th>
-              <th>Status</th>
-              <th>Start Time</th>
-              <th>End Time</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -71,31 +67,24 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
                     }
                   />
                   <button
-                    style={{ marginLeft: 4 }}
+                    style={{
+                      marginLeft: 4,
+                      height: 'auto',
+                      padding: '0.25em 0.75em',
+                      fontSize: 'inherit',
+                      lineHeight: 'inherit',
+                      verticalAlign: 'middle'
+                    }}
                     type="button"
                     onClick={() => {/* TODO: handle activation logic here */}}
                   >
                     Activate
                   </button>
                 </td>
-                <td>{schedule.name}</td>
-                <td>{schedule.assignmentType}</td>
-                <td>{schedule.roleDefinitionId}</td>
-                <td>{schedule.scope || 'N/A'}</td>
-                <td>{schedule.status || 'N/A'}</td>
-                <td>
-                  {schedule.startDateTime
-                    ? schedule.startDateTime instanceof Date
-                      ? schedule.startDateTime.toLocaleString()
-                      : String(schedule.startDateTime)
-                    : 'N/A'}
-                </td>
-                <td>
-                  {schedule.endDateTime
-                    ? schedule.endDateTime instanceof Date
-                      ? schedule.endDateTime.toLocaleString()
-                      : String(schedule.endDateTime)
-                    : 'N/A'}
+                <td title={schedule.roleDefinitionId}>
+                  {schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}</td>
+                <td title={schedule.scope ?? ''}>
+                  {schedule.expandedProperties?.scope?.displayName ?? 'unknown'}
                 </td>
               </tr>
             ))}
