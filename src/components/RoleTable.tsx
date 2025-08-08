@@ -83,7 +83,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 			setTenantNames(names)
 		}
 		fetchTenantNames()
-	}, [accounts, roleSchedules])
+	}, [roleSchedules])
 
 	return (
 		<Paper shadow="xs" p="md" mt="xl">

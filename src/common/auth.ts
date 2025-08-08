@@ -6,10 +6,13 @@ import {
 	LogLevel,
 	PublicClientApplication,
 } from "@azure/msal-browser"
-import {
-	AuthenticationProvider,
-	AuthenticationProviderOptions,
-} from "@microsoft/microsoft-graph-client"
+
+// These are the authorization scopes required for our tasks
+export const scopesGraphAndAzure = [
+	"https://management.azure.com/user_impersonation",
+	"User.Read",
+	"CrossTenantInformation.ReadBasic.All",
+]
 
 const redirectUri = chrome.identity.getRedirectURL()
 
@@ -67,7 +70,7 @@ export async function getChromeExtensionAzureToken() {
 		const activeAccount = currentAccount || allAccounts[0]
 		console.log("Using existing account:", activeAccount)
 		return msalInstance.acquireTokenSilent({
-			scopes: ["https://management.azure.com/.default", "offline_access"],
+			scopes: scopesGraphAndAzure,
 			account: activeAccount,
 		})
 	}
@@ -75,7 +78,7 @@ export async function getChromeExtensionAzureToken() {
 	return new Promise<AuthenticationResult>((resolve, reject) => {
 		msalInstance.handleRedirectPromise().then(() => {
 			msalInstance.acquireTokenRedirect({
-				scopes: ["https://management.azure.com/.default", "offline_access"],
+				scopes: scopesGraphAndAzure,
 				onRedirectNavigate: (url) => {
 					launchChromeWebAuthFlow(url)
 						.then((authcode) => {
@@ -130,32 +133,12 @@ export class AccountInfoTokenCredential implements TokenCredential {
 		return {
 			tokenType: "Bearer",
 			token: msalToken.accessToken,
-			expiresOnTimestamp:
-				msalToken.expiresOn?.getTime() ?? Date.now() + 3600 * 1000, // Default to 1 hour if not set
+			expiresOnTimestamp: msalToken.expiresOn?.getTime() ?? Date.now() + 3600 * 1000, // Default to 1 hour if not set
 		}
 	}
 }
 
 /** A AuthenticationProvider bridge between MSAL.js and the Graph SDK */
-export class AccountInfoAuthProvider
-	extends AccountInfoTokenCredential
-	implements AuthenticationProvider
-{
-	async getAccessToken(
-		authenticationProviderOptions?: AuthenticationProviderOptions
-	): Promise<string> {
-		const scopes = authenticationProviderOptions?.scopes ?? [".default"]
-		const accessToken = await this.getToken(scopes)
-		if (!accessToken) {
-			throw new Error(
-				`Failed to obtain access token with account ${
-					this.account.username
-				} for scopes ${scopes.join(", ")}`
-			)
-		}
-		return accessToken.token
-	}
-}
 
 async function launchChromeWebAuthFlow(url: string) {
 	const responseUrl = await chrome.identity.launchWebAuthFlow({
