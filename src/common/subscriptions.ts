@@ -1,9 +1,9 @@
-import { Subscription, SubscriptionClient, TenantIdDescription } from "@azure/arm-resources-subscriptions"
-import { AccountInfo } from "@azure/msal-browser"
-import { Client } from "@microsoft/microsoft-graph-client"
-import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials"
-import { AccountInfoTokenCredential } from "./auth"
-import { isEmptyObject } from "./util"
+import { Subscription, SubscriptionClient, TenantIdDescription } from '@azure/arm-resources-subscriptions'
+import { AccountInfo } from '@azure/msal-browser'
+import { Client } from '@microsoft/microsoft-graph-client'
+import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials'
+import { AccountInfoTokenCredential } from './auth'
+import { isEmptyObject } from './util'
 
 type SubscriptionCache = {
 	subscriptions: Subscription[]
@@ -32,7 +32,7 @@ async function getGraphClient(account: AccountInfo): Promise<Client> {
 	if (!client) {
 		client = Client.initWithMiddleware({
 			authProvider: new TokenCredentialAuthenticationProvider(new AccountInfoTokenCredential(account), {
-				scopes: ["https://graph.microsoft.com/.default"],
+				scopes: ['https://graph.microsoft.com/.default'],
 			}),
 		})
 		graphClients.set(cacheKey, client)
@@ -58,7 +58,7 @@ export async function findTenantInformation(account: AccountInfo, tenantId: stri
 }
 
 export async function fetchSubscriptions(account: AccountInfo, forceRefresh = false): Promise<Subscription[]> {
-	const key = "subscriptions"
+	const key = 'subscriptions'
 	const client = new SubscriptionClient(new AccountInfoTokenCredential(account))
 	if (forceRefresh) {
 		await chrome.storage.session.remove(key)
@@ -67,14 +67,14 @@ export async function fetchSubscriptions(account: AccountInfo, forceRefresh = fa
 	if (!subCache?.subscriptions || isEmptyObject(subCache?.subscriptions)) {
 		const subscriptions = await Array.fromAsync(client.subscriptions.list())
 		subCache = { subscriptions }
-		console.debug("Fetched subscriptions for account:", account.username)
+		console.debug('Fetched subscriptions for account:', account.username)
 		await chrome.storage.session.set(subCache)
 	}
 	return subCache.subscriptions
 }
 
 export async function fetchTenants(account: AccountInfo, forceRefresh = false): Promise<TenantIdDescription[]> {
-	const key = "tenants"
+	const key = 'tenants'
 	const client = new SubscriptionClient(new AccountInfoTokenCredential(account))
 	if (forceRefresh) {
 		await chrome.storage.session.remove(key)
@@ -83,7 +83,7 @@ export async function fetchTenants(account: AccountInfo, forceRefresh = false): 
 	if (!tenantCache?.tenants || isEmptyObject(tenantCache?.tenants)) {
 		const tenants = await Array.fromAsync(client.tenants.list())
 		tenantCache = { tenants }
-		console.debug("Fetched tenants for account:", account.username)
+		console.debug('Fetched tenants for account:', account.username)
 		await chrome.storage.session.set(tenantCache)
 	}
 	return tenantCache.tenants

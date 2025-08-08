@@ -4,9 +4,9 @@ but we'll keep some basic settings for the popup
 */
 
 body {
-  height: 600px;
-  width: 800px;
-  padding: 0;
-  margin: 0;
-  overflow-y: auto;
+	height: 600px;
+	width: 800px;
+	padding: 0;
+	margin: 0;
+	overflow-y: auto;
 }

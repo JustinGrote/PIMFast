@@ -7,16 +7,15 @@ import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
 import 'mantine-datatable/styles.layer.css'
 
-
 const theme = createTheme({
-  // You can customize the theme here
-  primaryColor: 'blue',
+	// You can customize the theme here
+	primaryColor: 'blue',
 })
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <MantineProvider defaultColorScheme="auto" theme={theme}>
-      <App />
-    </MantineProvider>
-  </StrictMode>,
+	<StrictMode>
+		<MantineProvider defaultColorScheme="auto" theme={theme}>
+			<App />
+		</MantineProvider>
+	</StrictMode>,
 )

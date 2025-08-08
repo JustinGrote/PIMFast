@@ -1,37 +1,37 @@
-import { AccessToken, TokenCredential } from "@azure/identity"
+import { AccessToken, TokenCredential } from '@azure/identity'
 import {
 	AccountInfo,
 	AuthenticationResult,
 	BrowserAuthOptions,
 	LogLevel,
 	PublicClientApplication,
-} from "@azure/msal-browser"
+} from '@azure/msal-browser'
 
 // These are the authorization scopes required for our tasks
 export const scopesGraphAndAzure = [
-	"https://management.azure.com/user_impersonation",
-	"User.Read",
-	"CrossTenantInformation.ReadBasic.All",
+	'https://management.azure.com/user_impersonation',
+	'User.Read',
+	'CrossTenantInformation.ReadBasic.All',
 ]
 
 const redirectUri = chrome.identity.getRedirectURL()
 
 // Only one interactive is allowed at a time. We store the interactive here so that it can be awaited as a semaphore
 const msalChromeExtensionAuthOptions: BrowserAuthOptions = {
-	clientId: "980df394-42ba-4a2c-919c-3e7609f3dbd1",
+	clientId: '980df394-42ba-4a2c-919c-3e7609f3dbd1',
 	redirectUri,
 	postLogoutRedirectUri: redirectUri,
 	onRedirectNavigate(url) {
 		launchChromeWebAuthFlow(url)
 			.then(msalInstance.handleRedirectPromise.bind(msalInstance))
 			.catch((err) => {
-				console.error("Error handling redirect:", err)
+				console.error('Error handling redirect:', err)
 			})
 	},
 }
 
 console.log(
-	`Reminder: Azure App Registration with Client ID ${msalChromeExtensionAuthOptions.clientId} needs to have the following redirect and logout URI configured: ${msalChromeExtensionAuthOptions.redirectUri}`
+	`Reminder: Azure App Registration with Client ID ${msalChromeExtensionAuthOptions.clientId} needs to have the following redirect and logout URI configured: ${msalChromeExtensionAuthOptions.redirectUri}`,
 )
 
 const msalInstance = new PublicClientApplication({
@@ -46,7 +46,7 @@ const msalInstance = new PublicClientApplication({
 		},
 	},
 	cache: {
-		cacheLocation: "localStorage",
+		cacheLocation: 'localStorage',
 	},
 })
 
@@ -61,14 +61,14 @@ export async function checkIfAuthenticated() {
 
 export async function getChromeExtensionAzureToken() {
 	await checkIfAuthenticated()
-	console.log("LastAuthCode: " + window.localStorage.getItem("lastAuthCode"))
+	console.log('LastAuthCode: ' + window.localStorage.getItem('lastAuthCode'))
 
 	const currentAccount = msalInstance.getActiveAccount()
 	const allAccounts = msalInstance.getAllAccounts()
 
 	if (currentAccount || allAccounts.length > 0) {
 		const activeAccount = currentAccount || allAccounts[0]
-		console.log("Using existing account:", activeAccount)
+		console.log('Using existing account:', activeAccount)
 		return msalInstance.acquireTokenSilent({
 			scopes: scopesGraphAndAzure,
 			account: activeAccount,
@@ -82,7 +82,7 @@ export async function getChromeExtensionAzureToken() {
 				onRedirectNavigate: (url) => {
 					launchChromeWebAuthFlow(url)
 						.then((authcode) => {
-							window.localStorage.setItem("lastAuthCode", authcode) // Store the auth code for debug
+							window.localStorage.setItem('lastAuthCode', authcode) // Store the auth code for debug
 							return authcode
 						})
 						.then(msalInstance.handleRedirectPromise.bind(msalInstance))
@@ -131,7 +131,7 @@ export class AccountInfoTokenCredential implements TokenCredential {
 			account: this.account,
 		})
 		return {
-			tokenType: "Bearer",
+			tokenType: 'Bearer',
 			token: msalToken.accessToken,
 			expiresOnTimestamp: msalToken.expiresOn?.getTime() ?? Date.now() + 3600 * 1000, // Default to 1 hour if not set
 		}
@@ -147,14 +147,14 @@ async function launchChromeWebAuthFlow(url: string) {
 	})
 
 	if (!responseUrl) {
-		throw new Error("WebAuthFlow failed to return a response URL.")
+		throw new Error('WebAuthFlow failed to return a response URL.')
 	}
 
 	// Response urls includes a hash (login, acquire token calls)
-	if (!responseUrl.includes("#")) {
+	if (!responseUrl.includes('#')) {
 		throw new Error(
-			"WebAuthFlow response URL does not contain a hash, indicating it was not a login or acquire token call."
+			'WebAuthFlow response URL does not contain a hash, indicating it was not a login or acquire token call.',
 		)
 	}
-	return `#${responseUrl.split("#")[1]}`
+	return `#${responseUrl.split('#')[1]}`
 }
