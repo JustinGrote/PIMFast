@@ -11,6 +11,9 @@ importers:
       '@azure/arm-authorization':
         specifier: ^9.0.0
         version: 9.0.0
+      '@azure/arm-resources-subscriptions':
+        specifier: ^2.1.0
+        version: 2.1.0
       '@azure/arm-subscriptions':
         specifier: ^5.1.0
         version: 5.1.0
@@ -29,6 +32,9 @@ importers:
       '@mantine/hooks':
         specifier: ^8.2.4
         version: 8.2.4(react@19.1.1)
+      '@microsoft/microsoft-graph-client':
+        specifier: ^3.0.7
+        version: 3.0.7(@azure/identity@4.11.1)(@azure/msal-browser@3.30.0)
       '@tabler/icons-react':
         specifier: ^3.34.1
         version: 3.34.1(react@19.1.1)
@@ -89,6 +95,10 @@ packages:
 
   '@azure/arm-authorization@9.0.0':
     resolution: {integrity: sha512-GdiCA8IA1gO+qcCbFEPj+iLC4+3ByjfKzmeAnkP7MdlL84Yo30Huo/EwbZzwRjYybXYUBuFxGPBB+yeTT4Ebxg==}
+    engines: {node: '>=14.0.0'}
+
+  '@azure/arm-resources-subscriptions@2.1.0':
+    resolution: {integrity: sha512-vKiu/3Yh84IV3IuJJ+0Fgs/ZQpvuGzoZ3dAoBksIV++Uu/Qz9RcQVz7pj+APWYIuODuR9I0eGKswZvzynzekug==}
     engines: {node: '>=14.0.0'}
 
   '@azure/arm-subscriptions@5.1.0':
@@ -451,6 +461,24 @@ packages:
     resolution: {integrity: sha512-ZXQ0uk6UtJa6Gl+ZWMBh4wC7UqCAoWWvau1TOoe05sBrkyGcXSVrTfoCVzjEQaB/h8VEOUWLGtJokkiMQKcMzA==}
     peerDependencies:
       react: ^18.x || ^19.x
+
+  '@microsoft/microsoft-graph-client@3.0.7':
+    resolution: {integrity: sha512-/AazAV/F+HK4LIywF9C+NYHcJo038zEnWkteilcxC1FM/uK/4NVGDKGrxx7nNq1ybspAroRKT4I1FHfxQzxkUw==}
+    engines: {node: '>=12.0.0'}
+    peerDependencies:
+      '@azure/identity': '*'
+      '@azure/msal-browser': '*'
+      buffer: '*'
+      stream-browserify: '*'
+    peerDependenciesMeta:
+      '@azure/identity':
+        optional: true
+      '@azure/msal-browser':
+        optional: true
+      buffer:
+        optional: true
+      stream-browserify:
+        optional: true
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -1288,6 +1316,16 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@azure/arm-resources-subscriptions@2.1.0':
+    dependencies:
+      '@azure/core-auth': 1.10.0
+      '@azure/core-client': 1.10.0
+      '@azure/core-paging': 1.6.2
+      '@azure/core-rest-pipeline': 1.22.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@azure/arm-subscriptions@5.1.0':
     dependencies:
       '@azure/abort-controller': 1.1.0
@@ -1676,6 +1714,14 @@ snapshots:
   '@mantine/hooks@8.2.4(react@19.1.1)':
     dependencies:
       react: 19.1.1
+
+  '@microsoft/microsoft-graph-client@3.0.7(@azure/identity@4.11.1)(@azure/msal-browser@3.30.0)':
+    dependencies:
+      '@babel/runtime': 7.28.2
+      tslib: 2.8.1
+    optionalDependencies:
+      '@azure/identity': 4.11.1
+      '@azure/msal-browser': 3.30.0
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:

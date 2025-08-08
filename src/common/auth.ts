@@ -1,7 +1,17 @@
-import { PublicClientApplication, BrowserAuthOptions, AuthenticationResult, LogLevel, AccountInfo } from "@azure/msal-browser"
 import { AccessToken, TokenCredential } from "@azure/identity"
+import {
+	AccountInfo,
+	AuthenticationResult,
+	BrowserAuthOptions,
+	LogLevel,
+	PublicClientApplication,
+} from "@azure/msal-browser"
+import {
+	AuthenticationProvider,
+	AuthenticationProviderOptions,
+} from "@microsoft/microsoft-graph-client"
 
-const redirectUri = chrome.identity.getRedirectURL();
+const redirectUri = chrome.identity.getRedirectURL()
 
 // Only one interactive is allowed at a time. We store the interactive here so that it can be awaited as a semaphore
 const msalChromeExtensionAuthOptions: BrowserAuthOptions = {
@@ -11,13 +21,15 @@ const msalChromeExtensionAuthOptions: BrowserAuthOptions = {
 	onRedirectNavigate(url) {
 		launchChromeWebAuthFlow(url)
 			.then(msalInstance.handleRedirectPromise.bind(msalInstance))
-			.catch(err => {
+			.catch((err) => {
 				console.error("Error handling redirect:", err)
-			});
+			})
 	},
 }
 
-console.log(`Reminder: Azure App Registration with Client ID ${msalChromeExtensionAuthOptions.clientId} needs to have the following redirect and logout URI configured: ${msalChromeExtensionAuthOptions.redirectUri}`);
+console.log(
+	`Reminder: Azure App Registration with Client ID ${msalChromeExtensionAuthOptions.clientId} needs to have the following redirect and logout URI configured: ${msalChromeExtensionAuthOptions.redirectUri}`
+)
 
 const msalInstance = new PublicClientApplication({
 	auth: msalChromeExtensionAuthOptions,
@@ -27,12 +39,12 @@ const msalInstance = new PublicClientApplication({
 				console.log(`[MSAL] ${level}: ${message}`)
 			},
 			logLevel: LogLevel.Trace,
-			piiLoggingEnabled: true
-		}
+			piiLoggingEnabled: true,
+		},
 	},
 	cache: {
-		cacheLocation: "localStorage"
-	}
+		cacheLocation: "localStorage",
+	},
 })
 
 await msalInstance.initialize()
@@ -56,8 +68,8 @@ export async function getChromeExtensionAzureToken() {
 		console.log("Using existing account:", activeAccount)
 		return msalInstance.acquireTokenSilent({
 			scopes: ["https://management.azure.com/.default", "offline_access"],
-			account: activeAccount
-		});
+			account: activeAccount,
+		})
 	}
 
 	return new Promise<AuthenticationResult>((resolve, reject) => {
@@ -66,12 +78,12 @@ export async function getChromeExtensionAzureToken() {
 				scopes: ["https://management.azure.com/.default", "offline_access"],
 				onRedirectNavigate: (url) => {
 					launchChromeWebAuthFlow(url)
-						.then(authcode => {
-							window.localStorage.setItem('lastAuthCode', authcode) // Store the auth code for debug
+						.then((authcode) => {
+							window.localStorage.setItem("lastAuthCode", authcode) // Store the auth code for debug
 							return authcode
 						})
 						.then(msalInstance.handleRedirectPromise.bind(msalInstance))
-						.then(result => {
+						.then((result) => {
 							if (!result || !result.account) {
 								return false
 							}
@@ -80,7 +92,7 @@ export async function getChromeExtensionAzureToken() {
 							return true
 						})
 						.catch(reject)
-				}
+				},
 			})
 		})
 	})
@@ -89,7 +101,7 @@ export async function getChromeExtensionAzureToken() {
 export async function logout(account?: AccountInfo) {
 	if (account) {
 		msalInstance.logoutRedirect({
-			account: account
+			account: account,
 		})
 	} else {
 		msalInstance.logoutRedirect()
@@ -104,39 +116,62 @@ export async function getAllAccounts(): Promise<AccountInfo[]> {
 
 /** A TokenCredential bridge between MSAL.js and the Azure SDK */
 export class AccountInfoTokenCredential implements TokenCredential {
-	account: AccountInfo;
+	account: AccountInfo
 
 	constructor(account: AccountInfo) {
-		this.account = account;
+		this.account = account
 	}
 
 	async getToken(scopes: string | string[]): Promise<AccessToken | null> {
 		const msalToken = await msalInstance.acquireTokenSilent({
 			scopes: Array.isArray(scopes) ? scopes : [scopes],
-			account: this.account
+			account: this.account,
 		})
 		return {
 			tokenType: "Bearer",
 			token: msalToken.accessToken,
-			expiresOnTimestamp: msalToken.expiresOn?.getTime()
-				?? Date.now() + 3600 * 1000 // Default to 1 hour if not set
+			expiresOnTimestamp:
+				msalToken.expiresOn?.getTime() ?? Date.now() + 3600 * 1000, // Default to 1 hour if not set
 		}
+	}
+}
+
+/** A AuthenticationProvider bridge between MSAL.js and the Graph SDK */
+export class AccountInfoAuthProvider
+	extends AccountInfoTokenCredential
+	implements AuthenticationProvider
+{
+	async getAccessToken(
+		authenticationProviderOptions?: AuthenticationProviderOptions
+	): Promise<string> {
+		const scopes = authenticationProviderOptions?.scopes ?? [".default"]
+		const accessToken = await this.getToken(scopes)
+		if (!accessToken) {
+			throw new Error(
+				`Failed to obtain access token with account ${
+					this.account.username
+				} for scopes ${scopes.join(", ")}`
+			)
+		}
+		return accessToken.token
 	}
 }
 
 async function launchChromeWebAuthFlow(url: string) {
 	const responseUrl = await chrome.identity.launchWebAuthFlow({
 		url: url,
-		interactive: true
+		interactive: true,
 	})
 
 	if (!responseUrl) {
-		throw new Error("WebAuthFlow failed to return a response URL.");
+		throw new Error("WebAuthFlow failed to return a response URL.")
 	}
 
-		// Response urls includes a hash (login, acquire token calls)
+	// Response urls includes a hash (login, acquire token calls)
 	if (!responseUrl.includes("#")) {
-		throw new Error("WebAuthFlow response URL does not contain a hash, indicating it was not a login or acquire token call.");
+		throw new Error(
+			"WebAuthFlow response URL does not contain a hash, indicating it was not a login or acquire token call."
+		)
 	}
 	return `#${responseUrl.split("#")[1]}`
 }
