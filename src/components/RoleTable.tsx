@@ -8,6 +8,7 @@ import { DataTable } from 'mantine-datatable'
 import React, { useEffect, useState } from 'react'
 import { getAllAccounts } from '../common/auth'
 import { getRoleEligibilitySchedules } from '../common/pim'
+import './RoleTable.css'
 
 interface RoleTableProps {
 	onRefresh?: () => void
@@ -77,6 +78,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 					</Group>
 				) : roleSchedules.length > 0 ? (
 					<DataTable
+						className="roleTable"
 						withTableBorder
 						borderRadius="xs"
 						withColumnBorders
@@ -89,7 +91,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 								title: '',
 								width: '80',
 								render: (schedule: RoleAssignmentScheduleInstance, index: number) => (
-									<Group gap="xs">
+									<div className="one-line-row">
 										<Checkbox
 											checked={!!checkedRows[index]}
 											onChange={() =>
@@ -98,20 +100,21 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 													[index]: !prev[index],
 												}))
 											}
+											className="one-line-checkbox"
 										/>
-										<Button variant="subtle" color="green" size="xs">
+										<Button variant="subtle" color="green" size="xs" className="one-line-button">
 											<IconPlayerPlay />
 										</Button>
-									</Group>
+									</div>
 								),
 							},
 							{
 								accessor: 'roleDefinition',
 								title: 'Role',
 								render: (schedule: RoleAssignmentScheduleInstance) => (
-									<Text title={schedule.roleDefinitionId || ''}>
+									<span className="one-line-row" title={schedule.roleDefinitionId || ''}>
 										{schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
-									</Text>
+									</span>
 								),
 							},
 							{
@@ -133,12 +136,12 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 											icon = <IconQuestionMark />
 									}
 									return (
-										<Group gap="xs">
+										<span className="one-line-row">
 											{icon}
-											<Text title={schedule.scope ?? ''}>
+											<span className="one-line-text" title={schedule.scope ?? ''}>
 												{schedule.expandedProperties?.scope?.displayName ?? 'unknown'}
-											</Text>
-										</Group>
+											</span>
+										</span>
 									)
 								},
 							},
@@ -146,9 +149,9 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 								accessor: 'tenant',
 								title: 'Tenant',
 								render: (schedule: RoleAssignmentScheduleInstance) => {
-									if (!schedule.scope) return <Text>Unknown</Text>
+									if (!schedule.scope) return <span className="one-line-row">Unknown</span>
 									const tenantName = tenantNames[schedule.scope]
-									return <Text>{tenantName || 'Unknown'}</Text>
+									return <span className="one-line-row">{tenantName || 'Unknown'}</span>
 								},
 							},
 						]}
