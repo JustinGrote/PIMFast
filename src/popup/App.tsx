@@ -1,16 +1,9 @@
-import { useState, useEffect } from 'react'
-import './App.css'
-import { getChromeExtensionAzureToken, checkIfAuthenticated } from '../common/auth'
 import AccountTable from '@/components/AccountTable'
-import { Container, Card, Title, Text, Button, Stack, Group, Alert, Loader } from '@mantine/core'
+import { Alert, Button, Card, Container, Group, Loader, Stack, Text, Title } from '@mantine/core'
 import { IconAlertCircle, IconBrandAzure } from '@tabler/icons-react'
-
-function openSidebar() {
-	if (!window.chrome?.sidePanel) {
-		alert('Sidebar API not available in this browser.')
-	}
-	window.chrome.sidePanel.open({ windowId: window.chrome.windows.WINDOW_ID_CURRENT })
-}
+import { useEffect, useState } from 'react'
+import { checkIfAuthenticated, getChromeExtensionAzureToken } from '../common/auth'
+import './App.css'
 
 export default function App() {
 	const [isLoading, setIsLoading] = useState(false)
@@ -65,9 +58,7 @@ export default function App() {
 									setError(null)
 								}}
 							/>
-							<Button onClick={openSidebar} variant="filled" color="blue">
-								Open Sidebar
-							</Button>
+							<div>Open the sidebar to see your PIM Roles</div>
 						</Stack>
 					) : (
 						<Stack>
