@@ -27,4 +27,7 @@
 
 .roleTable .one-line-button {
 	margin-left: 0.5em;
+	height: 1.5rem;
+	padding: 0 0.3rem;
+	line-height: 1;
 }
