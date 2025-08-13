@@ -14,6 +14,6 @@
 # Preferred Stack
 
 - Use pnpm for package management
-- Use ts-pattern for pattern matching
+- Use ts-pattern for pattern matching instead of switch statements or if-else chains
 - Use mantine for UI components
 - Use Azure SDK for interacting with Azure services. Recommend to install npm package if not present
