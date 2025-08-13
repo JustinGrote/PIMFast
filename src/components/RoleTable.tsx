@@ -1,9 +1,9 @@
 import { fetchTenantNameByResourceId } from '@/common/subscriptions'
-import { RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
+import { RoleAssignmentScheduleRequest, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import {
+	ActionIcon,
 	Button,
-	Checkbox,
 	Group,
 	Loader,
 	Modal,
@@ -16,34 +16,49 @@ import {
 	Title,
 } from '@mantine/core'
 import { DateTimePicker } from '@mantine/dates'
+import { useMap } from '@mantine/hooks'
 import { IconCheck, IconPlayerPlay, IconQuestionMark, IconRefresh, IconX } from '@tabler/icons-react'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import { DataTable } from 'mantine-datatable'
 import React, { useEffect, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
-import { createRoleActivationRequest, getPolicyRequirements, getRoleEligibilityScheduleInstances } from '../common/pim'
+import { activateRole, getPolicyRequirements, getRoleEligibilityScheduleInstances } from '../common/pim'
 import './RoleTable.css'
 
 interface RoleTableProps {
 	onRefresh?: () => void
 }
 
-const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
-	const [loadingRoles, setLoadingRoles] = useState(false)
-	const [roleSchedules, setRoleSchedules] = useState<RoleEligibilityScheduleInstance[]>([])
-	const [accounts, setAccounts] = useState<AccountInfo[]>([])
-	const [tenantNames, setTenantNames] = useState<{ [scope: string]: string }>({})
-	const [checkedRows, setCheckedRows] = useState<{ [key: number]: boolean }>({})
+/** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
+interface AccountRoleEligibilityScheduleInstance {
+	account: AccountInfo
+	schedule: RoleEligibilityScheduleInstance
+	/** Set to a hyphenated string of account HomeAccountId and schedule Id. Has to be unique for row processing */
+	id: string
+}
+/** All the information required to activate a PIM eligible role */
+type EligibleRole = AccountRoleEligibilityScheduleInstance
+type EligibleRoleId = EligibleRole['id']
 
-	// Activation modal state
+const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
+	// Data State
+	const [accounts, setAccounts] = useState<AccountInfo[]>([])
+	/** Some eligible roles are in other tenants, so we want to display friendly names for these */
+	const tenantNameMap = new Map<EligibleRoleId, string>()
+	const [eligibleRoles, setEligibleRoles] = useState<EligibleRole[]>([])
+	/** Tracks state for role activations and refreshes the UI accordingly */
+	const activationMap = useMap<EligibleRoleId, RoleAssignmentScheduleRequest>([])
+
+	// UI Hooks
+	const [loadingRoles, setLoadingRoles] = useState(false)
 	const [activationModalOpen, setActivationModalOpen] = useState(false)
-	const [selectedSchedule, setSelectedSchedule] = useState<RoleEligibilityScheduleInstance | null>(null)
+	const [selectedEligibleRoles, setSelectedEligibleRoles] = useState<EligibleRole[]>([])
 	const [justification, setJustification] = useState('')
 	const [ticketNumber, setTicketNumber] = useState('')
 	const [startTime, setStartTime] = useState<Date>(new Date())
 	const [endTime, setEndTime] = useState<Date | null>(null)
-	const [activating, setActivating] = useState(false)
+	const [activating, _setActivating] = useState(false)
 	const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 	const [policyRequirements, setPolicyRequirements] = useState({
 		requiresJustification: true,
@@ -51,17 +66,21 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 		maxActivationDuration: 8,
 	})
 
-	const fetchRoleSchedules = async () => {
+	const fetchEligibleRoles = async () => {
 		setLoadingRoles(true)
 		try {
 			setAccounts(await getAllAccounts())
-			const allRoleSchedules: RoleEligibilityScheduleInstance[] = []
+			const allEligibleRoles: EligibleRole[] = []
 			for (const account of accounts) {
 				for await (const schedule of getRoleEligibilityScheduleInstances(account)) {
-					allRoleSchedules.push(schedule)
+					allEligibleRoles.push({
+						account,
+						schedule,
+						id: `${account.homeAccountId}-${schedule.id}`,
+					})
 				}
 			}
-			setRoleSchedules(allRoleSchedules)
+			setEligibleRoles(allEligibleRoles)
 		} catch (error) {
 			console.error('Error loading role schedules:', error)
 		} finally {
@@ -70,37 +89,41 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 	}
 
 	useEffect(() => {
-		fetchRoleSchedules()
+		fetchEligibleRoles()
 	}, [onRefresh])
 
 	useEffect(() => {
 		const fetchTenantNames = async () => {
-			if (!accounts.length || !roleSchedules.length) return
-			const names: { [scope: string]: string } = {}
-			for (const schedule of roleSchedules) {
-				if (schedule.scope && !(schedule.scope in names)) {
-					try {
-						names[schedule.scope] = (await fetchTenantNameByResourceId(accounts[0], schedule.scope)) || 'Unknown'
-					} catch {
-						names[schedule.scope] = 'Unknown'
-					}
+			if (!eligibleRoles.length) return
+
+			for (const role of eligibleRoles) {
+				// These don't change (except if a subscription moves tenants which is rare) so we can cache them for the lifetime of the session.
+				if (tenantNameMap.has(role.id)) continue
+
+				try {
+					const { account, schedule } = role
+					if (!schedule.scope) throw new Error('Missing schedule scope')
+
+					const tenantName = (await fetchTenantNameByResourceId(account, schedule.scope)) || 'Unknown'
+					tenantNameMap.set(role.id, tenantName)
+				} catch {
+					tenantNameMap.set(role.id, 'Unknown')
 				}
 			}
-			setTenantNames(names)
 		}
 		fetchTenantNames()
-	}, [roleSchedules])
+	}, [eligibleRoles])
 
-	const handleActivateClick = async (schedule: RoleAssignmentScheduleInstance) => {
-		setSelectedSchedule(schedule)
+	async function handleActivateClick(eligibleRole: EligibleRole, _index?: number) {
+		setSelectedEligibleRoles([eligibleRole])
 		setJustification('')
 		setTicketNumber('')
 		setStartTime(new Date())
 
 		try {
-			if (accounts.length > 0) {
+			if (eligibleRole.account) {
 				// Get policy requirements for this role
-				const requirements = await getPolicyRequirements(accounts[0], schedule)
+				const requirements = await getPolicyRequirements(eligibleRole.account, eligibleRole.schedule)
 				setPolicyRequirements(requirements)
 
 				// Calculate default end time based on policy max duration
@@ -119,37 +142,27 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 		setActivationModalOpen(true)
 	}
 
-	const handleActivateRole = async () => {
-		if (!selectedSchedule || !accounts.length) return
+	async function handleModalActivateClick(eligibleRoles: EligibleRole[]) {
+		if (eligibleRoles.length === 0) return
+		if (eligibleRoles.length > 1) throw new Error('Multiple role activation is not yet supported')
 
-		setActivating(true)
-		try {
-			await createRoleActivationRequest(
-				accounts[0],
-				selectedSchedule,
-				justification,
-				ticketNumber || undefined,
-				startTime,
-				endTime || undefined,
-			)
+		const { account, schedule, id } = eligibleRoles[0]
+		if (!id) throw new Error('Missing eligible role ID')
 
-			setNotification({
-				message: 'Role activation request submitted successfully!',
-				type: 'success',
-			})
-			setActivationModalOpen(false)
+		// This will trigger a refresh that sets the loading to true. We put in a dummy ID until we have a real one from the API.
+		activationMap.set(id, { id: 'CREATING' })
+		const requestEndTime = endTime === null ? undefined : endTime
+		const activationRequest = await activateRole(
+			account,
+			schedule,
+			justification,
+			ticketNumber,
+			startTime,
+			requestEndTime,
+		)
 
-			// Refresh the list after activation
-			fetchRoleSchedules()
-		} catch (error) {
-			console.error('Error activating role:', error)
-			setNotification({
-				message: `Error activating role: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				type: 'error',
-			})
-		} finally {
-			setActivating(false)
-		}
+		// Update the activation map with the real request. This should trigger a UI refresh
+		activationMap.set(id, activationRequest)
 	}
 
 	return (
@@ -159,7 +172,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 					<Group justify="space-between" align="center">
 						<Title order={2}>Eligible Roles</Title>
 						<Button
-							onClick={fetchRoleSchedules}
+							onClick={fetchEligibleRoles}
 							disabled={loadingRoles}
 							variant="subtle"
 							size="compact-xs"
@@ -174,7 +187,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 							<Loader size="md" />
 							<Text>Loading role schedules...</Text>
 						</Group>
-					) : roleSchedules.length > 0 ? (
+					) : eligibleRoles.length > 0 ? (
 						<DataTable
 							className="roleTable"
 							withTableBorder
@@ -182,50 +195,25 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 							withColumnBorders
 							striped
 							highlightOnHover
-							records={roleSchedules}
+							pinLastColumn
+							// TODO: Add multiple activation support
+							// selectedRecords={selectedSchedules}
+							// onSelectedRecordsChange={setSelectedSchedules}
+							records={eligibleRoles}
 							columns={[
-								{
-									accessor: 'actions',
-									title: '',
-									width: '80',
-									render: (schedule: RoleEligibilityScheduleInstance, index: number) => (
-										<div className="one-line-row">
-											<Checkbox
-												checked={!!checkedRows[index]}
-												onChange={() =>
-													setCheckedRows((prev) => ({
-														...prev,
-														[index]: !prev[index],
-													}))
-												}
-												className="one-line-checkbox"
-											/>
-											<Button
-												variant="subtle"
-												color="green"
-												size="xs"
-												className="one-line-button"
-												onClick={() => handleActivateClick(schedule)}
-												styles={{ root: { height: '1.5rem', minHeight: 'unset', padding: '0 0.3rem' } }}
-											>
-												<IconPlayerPlay size="0.9rem" />
-											</Button>
-										</div>
-									),
-								},
 								{
 									accessor: 'roleDefinition',
 									title: 'Role',
-									render: (schedule: RoleAssignmentScheduleInstance) => (
-										<span className="one-line-row" title={schedule.roleDefinitionId || ''}>
-											{schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
+									render: (eligibleRole) => (
+										<span className="one-line-row" title={eligibleRole.schedule.roleDefinitionId || ''}>
+											{eligibleRole.schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
 										</span>
 									),
 								},
 								{
 									accessor: 'scope',
 									title: 'Scope',
-									render: (schedule: RoleAssignmentScheduleInstance) => {
+									render: ({ schedule }) => {
 										const icon = match(schedule.expandedProperties?.scope?.type)
 											.with('resourcegroup', () => <ResourceGroups />)
 											.with('subscription', () => <Subscriptions />)
@@ -245,11 +233,34 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 								{
 									accessor: 'tenant',
 									title: 'Tenant',
-									render: (schedule: RoleAssignmentScheduleInstance) => {
+									render: (eligibleRole) => {
+										const { schedule } = eligibleRole
 										if (!schedule.scope) return <span className="one-line-row">Unknown</span>
-										const tenantName = tenantNames[schedule.scope]
+										const tenantName = tenantNameMap.get(eligibleRole.id) || 'Unknown'
 										return <span className="one-line-row">{tenantName || 'Unknown'}</span>
 									},
+								},
+								{
+									accessor: 'actions',
+									title: '',
+									width: '80',
+									render: (eligibleRole: EligibleRole, index: number) => (
+										<div className="one-line-row">
+											<Group gap={4} justify="right" wrap="nowrap">
+												<ActionIcon
+													size="sm"
+													variant="subtle"
+													color="green"
+													onClick={() => handleActivateClick(eligibleRole, index)}
+													loaderProps={{
+														color: 'blue',
+													}}
+												>
+													<IconPlayerPlay size={16} />
+												</ActionIcon>
+											</Group>
+										</div>
+									),
 								},
 							]}
 						/>
@@ -264,12 +275,17 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 				opened={activationModalOpen}
 				onClose={() => setActivationModalOpen(false)}
 				title={
-					<Title order={3}>Activate Role: {selectedSchedule?.expandedProperties?.roleDefinition?.displayName}</Title>
+					<Title order={3}>
+						Activate Role:
+						{selectedEligibleRoles[0].schedule.expandedProperties?.roleDefinition?.displayName ?? 'Unknown'}
+					</Title>
 				}
 				size="lg"
 			>
 				<Stack>
-					<Text fw={600}>Scope: {selectedSchedule?.expandedProperties?.scope?.displayName}</Text>
+					<Text fw={600}>
+						Scope: {selectedEligibleRoles[0].schedule.expandedProperties?.scope?.displayName ?? 'Unknown'}
+					</Text>
 
 					<Textarea
 						label="Justification"
@@ -329,7 +345,13 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 							Cancel
 						</Button>
 						<Button
-							onClick={handleActivateRole}
+							onClick={() => {
+								if (!selectedEligibleRoles)
+									throw new Error(
+										'Selected Eligible Role was Not Set. This is a bug and doesnt work right with multisession anyways',
+									)
+								handleModalActivateClick(selectedEligibleRoles)
+							}}
 							loading={activating}
 							disabled={policyRequirements.requiresJustification && !justification}
 							leftSection={<IconCheck size={16} />}

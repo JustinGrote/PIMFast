@@ -21,6 +21,7 @@
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@tabler/icons-react": "^3.34.1",
     "@threeveloper/azure-react-icons": "^1.1.1",
+    "clsx": "^2.1.1",
     "mantine-datatable": "^8.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

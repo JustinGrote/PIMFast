@@ -6,13 +6,29 @@ import {
 import { AccountInfo } from '@azure/msal-browser'
 import { AccountInfoTokenCredential } from './auth'
 
+// Scoping to subscription is not needed for the client as we will do it in our requests
+const UNSPECIFIED_SUBSCRIPTION_ID = '00000000-0000-0000-0000-000000000000'
+
+let pimClient: AuthorizationManagementClient
+
+/**
+ * Returns a singleton AuthorizationManagementClient for the app per best practice
+ * @param account The account info.
+ */
+function getPimClient(account: AccountInfo) {
+	if (!pimClient) {
+		const credential = new AccountInfoTokenCredential(account)
+		pimClient = new AuthorizationManagementClient(credential, UNSPECIFIED_SUBSCRIPTION_ID)
+	}
+	return pimClient
+}
+
 export async function* getRoleEligibilitySchedules(account: AccountInfo, scope: string = '') {
 	try {
-		const credential = new AccountInfoTokenCredential(account)
-		const unspecifiedSubscriptionId = '00000000-0000-0000-0000-000000000000'
-		const pimClient = new AuthorizationManagementClient(credential, unspecifiedSubscriptionId)
+		const pimClient = getPimClient(account)
 
 		const roleScheduleIterators = []
+		// asTarget() is needed or else elevated permissions are required
 		roleScheduleIterators.push(pimClient.roleEligibilitySchedules.listForScope(scope, { filter: 'asTarget()' }))
 
 		for await (const iterator of roleScheduleIterators) {
@@ -25,12 +41,9 @@ export async function* getRoleEligibilitySchedules(account: AccountInfo, scope: 
 		console.error('Error in getRoleEligibilitySchedules:', err)
 	}
 }
-
 export async function* getRoleEligibilityScheduleInstances(account: AccountInfo, scope: string = '') {
 	try {
-		const credential = new AccountInfoTokenCredential(account)
-		const unspecifiedSubscriptionId = '00000000-0000-0000-0000-000000000000'
-		const pimClient = new AuthorizationManagementClient(credential, unspecifiedSubscriptionId)
+		const pimClient = getPimClient(account)
 
 		const roleScheduleIterators = []
 		roleScheduleIterators.push(pimClient.roleEligibilityScheduleInstances.listForScope(scope, { filter: 'asTarget()' }))
@@ -55,9 +68,7 @@ export async function getRoleManagementPolicyAssignments(
 			throw new Error('Schedule is missing scope or roleDefinitionId')
 		}
 
-		const credential = new AccountInfoTokenCredential(account)
-		const unspecifiedSubscriptionId = '00000000-0000-0000-0000-000000000000'
-		const pimClient = new AuthorizationManagementClient(credential, unspecifiedSubscriptionId)
+		const pimClient = getPimClient(account)
 
 		// The policy assignment is linked to the role definition and scope
 		const policyAssignments = await pimClient.roleManagementPolicyAssignments.listForScope(schedule.scope)
@@ -93,6 +104,7 @@ export async function getRoleManagementPolicyAssignments(
 }
 
 export async function getPolicyRequirements(_account: AccountInfo, _schedule: RoleEligibilityScheduleInstance) {
+	// FIXME: Implement policy requirement fetching logic
 	return {
 		requiresJustification: true,
 		requiresTicket: false,
@@ -100,28 +112,26 @@ export async function getPolicyRequirements(_account: AccountInfo, _schedule: Ro
 	}
 }
 
-export async function createRoleActivationRequest(
+export async function activateRole(
 	account: AccountInfo,
-	schedule: RoleEligibilityScheduleInstance,
+	scheduleInstance: RoleEligibilityScheduleInstance,
 	justification: string,
 	ticketNumber?: string,
 	startTime?: Date,
 	endTime?: Date,
 ) {
 	try {
-		if (!schedule.scope || !schedule.roleDefinitionId || !schedule.principalId) {
+		if (!scheduleInstance.scope || !scheduleInstance.roleDefinitionId || !scheduleInstance.principalId) {
 			throw new Error('Schedule is missing required properties')
 		}
 
-		const credential = new AccountInfoTokenCredential(account)
-		const unspecifiedSubscriptionId = '00000000-0000-0000-0000-000000000000'
-		const pimClient = new AuthorizationManagementClient(credential, unspecifiedSubscriptionId)
+		const pimClient = getPimClient(account)
 
 		// Create a role assignment schedule request (activation)
 		const requestProperties: RoleAssignmentScheduleRequest = {
-			linkedRoleEligibilityScheduleId: schedule.roleEligibilityScheduleId,
+			linkedRoleEligibilityScheduleId: scheduleInstance.roleEligibilityScheduleId,
 			principalId: account.localAccountId,
-			roleDefinitionId: schedule.roleDefinitionId,
+			roleDefinitionId: scheduleInstance.roleDefinitionId,
 			requestType: 'SelfActivate',
 			scheduleInfo: {
 				startDateTime: startTime || new Date(),
@@ -138,7 +148,7 @@ export async function createRoleActivationRequest(
 		const requestName = crypto.randomUUID()
 
 		const request = await pimClient.roleAssignmentScheduleRequests.create(
-			schedule.scope,
+			scheduleInstance.scope,
 			requestName,
 			requestProperties,
 		)
@@ -150,3 +160,64 @@ export async function createRoleActivationRequest(
 		throw err
 	}
 }
+
+/** Parse an Azure Resource ID into its component parts. This works for resources only. */
+export type AzureResourceId = {
+	scope: string
+	id: string
+	subscription: string
+	resourceGroup: string
+	provider: string
+	type: string
+}
+
+export function parseResourceId(resourceId: string): AzureResourceId {
+	const match = resourceId.match(
+		/^\/subscriptions\/([^\/]+)\/resourceGroups\/([^\/]+)\/providers\/([^\/]+)\/([^\/]+)\/([^\/]+)$/,
+	)
+
+	if (!match) {
+		throw new Error(
+			'Invalid resource ID format. Expected format: /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProvider}/{resourceType}/{resourceId}',
+		)
+	}
+
+	const [, subscription, resourceGroup, provider, type, id] = match
+
+	return {
+		scope: `/subscriptions/${subscription}/resourceGroups/${resourceGroup}`,
+		id,
+		subscription,
+		resourceGroup,
+		provider,
+		type,
+	}
+}
+
+/**
+ * Gets the status of a role eligibility schedule request.
+ * @param account The account info.
+ * @param requestId The ID of the RoleAssignmentScheduleRequest.
+ */
+export async function getRoleAssignmentScheduleRequest(
+	account: AccountInfo,
+	requestId: RoleAssignmentScheduleRequestId,
+) {
+	try {
+		const pimClient = getPimClient(account)
+
+		const { scope, id } = parseResourceId(requestId)
+		const response = await pimClient.roleAssignmentScheduleRequests.get(scope, id)
+
+		console.debug(`Role Assignment Schedule Request ${response.id} is ${response.status}`)
+
+		return response
+	} catch (err) {
+		console.error('Error in getRoleEligibilityScheduleRequestStatus:', err)
+		throw err
+	}
+}
+
+// These types are useful for uniquely identifying these items without using their objects
+export type RoleAssignmentScheduleRequestId = NonNullable<RoleAssignmentScheduleRequest['id']>
+export type RoleEligibilityScheduleInstanceId = NonNullable<RoleEligibilityScheduleInstance['id']>
