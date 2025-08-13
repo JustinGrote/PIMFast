@@ -20,6 +20,7 @@ import { IconCheck, IconPlayerPlay, IconQuestionMark, IconRefresh, IconX } from 
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import { DataTable } from 'mantine-datatable'
 import React, { useEffect, useState } from 'react'
+import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
 import { createRoleActivationRequest, getPolicyRequirements, getRoleEligibilityScheduleInstances } from '../common/pim'
 import './RoleTable.css'
@@ -225,20 +226,12 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 									accessor: 'scope',
 									title: 'Scope',
 									render: (schedule: RoleAssignmentScheduleInstance) => {
-										let icon
-										switch (schedule.expandedProperties?.scope?.type) {
-											case 'resourcegroup':
-												icon = <ResourceGroups />
-												break
-											case 'subscription':
-												icon = <Subscriptions />
-												break
-											case 'managementgroup':
-												icon = <ManagementGroups />
-												break
-											default:
-												icon = <IconQuestionMark />
-										}
+										const icon = match(schedule.expandedProperties?.scope?.type)
+											.with('resourcegroup', () => <ResourceGroups />)
+											.with('subscription', () => <Subscriptions />)
+											.with('managementgroup', () => <ManagementGroups />)
+											.otherwise(() => <IconQuestionMark />)
+
 										return (
 											<span className="one-line-row">
 												{icon}
