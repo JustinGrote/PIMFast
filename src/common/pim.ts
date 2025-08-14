@@ -108,7 +108,7 @@ export async function getPolicyRequirements(_account: AccountInfo, _schedule: Ro
 	return {
 		requiresJustification: true,
 		requiresTicket: false,
-		maxActivationDuration: 8, // Default 8 hours
+		maxDuration: 'PT24H', // Default 1 day
 	}
 }
 

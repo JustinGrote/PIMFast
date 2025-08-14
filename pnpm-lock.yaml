@@ -44,6 +44,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dayjs:
+        specifier: ^1.11.13
+        version: 1.11.13
       mantine-datatable:
         specifier: ^8.2.0
         version: 8.2.0(@mantine/core@8.2.4(@mantine/hooks@8.2.4(react@19.1.1))(@types/react@19.1.9)(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(@mantine/hooks@8.2.4(react@19.1.1))(clsx@2.1.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)

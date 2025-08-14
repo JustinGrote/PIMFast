@@ -9,6 +9,7 @@ import {
 	Modal,
 	Notification,
 	Paper,
+	Slider,
 	Stack,
 	Text,
 	Textarea,
@@ -19,12 +20,18 @@ import { DateTimePicker } from '@mantine/dates'
 import { useMap } from '@mantine/hooks'
 import { IconCheck, IconPlayerPlay, IconQuestionMark, IconRefresh, IconX } from '@tabler/icons-react'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
+import dayjs from 'dayjs'
+import durationPlugin from 'dayjs/plugin/duration'
+import relativeTimePlugin from 'dayjs/plugin/relativeTime'
 import { DataTable } from 'mantine-datatable'
 import { useEffect, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
 import { activateRole, getPolicyRequirements, getRoleEligibilityScheduleInstances } from '../common/pim'
 import './RoleTable.css'
+
+dayjs.extend(durationPlugin)
+dayjs.extend(relativeTimePlugin)
 
 /** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
 interface AccountRoleEligibilityScheduleInstance {
@@ -63,7 +70,7 @@ function RoleTable() {
 	const [policyRequirements, setPolicyRequirements] = useState({
 		requiresJustification: true,
 		requiresTicket: false,
-		maxActivationDuration: 8,
+		maxDuration: 'PT8H',
 	})
 	const [modalError, setModalError] = useState<string | null>(null)
 
@@ -154,19 +161,10 @@ function RoleTable() {
 				// Get policy requirements for this role
 				const requirements = await getPolicyRequirements(eligibleRole.account, eligibleRole.schedule)
 				setPolicyRequirements(requirements)
-
-				// Calculate default end time based on policy max duration
-				const defaultEndTime = new Date()
-				defaultEndTime.setHours(defaultEndTime.getHours() + requirements.maxActivationDuration)
-				setEndTime(defaultEndTime)
 			}
 		} catch (error) {
 			console.error('Error getting policy requirements:', error)
 			setModalError('Failed to load policy requirements. Please try again or contact support.')
-			// Set default end time (8 hours from now)
-			const defaultEndTime = new Date()
-			defaultEndTime.setHours(defaultEndTime.getHours() + 8)
-			setEndTime(defaultEndTime)
 		}
 
 		setActivationModalOpen(true)
@@ -372,6 +370,31 @@ function RoleTable() {
 						minRows={3}
 					/>
 
+					<Text fw={600}>Activation Duration</Text>
+					<Slider
+						color="blue"
+						labelAlwaysOn
+						style={{ marginLeft: 16 }}
+						// All values in minutes
+						defaultValue={60}
+						min={5}
+						step={5}
+						max={dayjs.duration(policyRequirements.maxDuration).asMinutes()}
+						mt="md"
+						label={value => {
+							return dayjs.duration(value, 'minutes').humanize()
+						}}
+					/>
+
+					{/* Optional Parameters Section */}
+					<Title
+						order={5}
+						mt="md"
+					>
+						Optional Parameters
+					</Title>
+					{/* You can add more optional fields here as needed */}
+
 					{policyRequirements.requiresTicket && (
 						<TextInput
 							label="Ticket Number"
@@ -392,23 +415,13 @@ function RoleTable() {
 					)}
 
 					<DateTimePicker
-						label="Start Time"
+						label="Custom Start Time (optional)"
 						value={startTime}
 						onChange={(value: string | null) => {
 							if (value) {
 								setStartTime(new Date(value))
 							}
 						}}
-						required
-					/>
-
-					<DateTimePicker
-						label={`End Time (max ${policyRequirements.maxActivationDuration} hours)`}
-						value={endTime}
-						onChange={(value: string | null) => {
-							setEndTime(value ? new Date(value) : null)
-						}}
-						clearable
 					/>
 
 					<Group
