@@ -24,7 +24,7 @@ const msalChromeExtensionAuthOptions: BrowserAuthOptions = {
 	onRedirectNavigate(url) {
 		launchChromeWebAuthFlow(url)
 			.then(msalInstance.handleRedirectPromise.bind(msalInstance))
-			.catch((err) => {
+			.catch(err => {
 				console.error('Error handling redirect:', err)
 			})
 	},
@@ -38,7 +38,7 @@ const msalInstance = new PublicClientApplication({
 	auth: msalChromeExtensionAuthOptions,
 	system: {
 		loggerOptions: {
-			loggerCallback: (level, message, _) => {
+			loggerCallback: (level, message) => {
 				console.log(`[MSAL] ${level}: ${message}`)
 			},
 			logLevel: LogLevel.Warning,
@@ -79,14 +79,14 @@ export async function getChromeExtensionAzureToken() {
 		msalInstance.handleRedirectPromise().then(() => {
 			msalInstance.acquireTokenRedirect({
 				scopes: scopesGraphAndAzure,
-				onRedirectNavigate: (url) => {
+				onRedirectNavigate: url => {
 					launchChromeWebAuthFlow(url)
-						.then((authcode) => {
+						.then(authcode => {
 							window.localStorage.setItem('lastAuthCode', authcode) // Store the auth code for debug
 							return authcode
 						})
 						.then(msalInstance.handleRedirectPromise.bind(msalInstance))
-						.then((result) => {
+						.then(result => {
 							if (!result || !result.account) {
 								return false
 							}

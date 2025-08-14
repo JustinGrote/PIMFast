@@ -53,69 +53,69 @@ export function parseResourceId(resourceId: string): AzureResourceId {
 	const patterns = [
 		{
 			// Tenant
-			regex: /^\/tenants\/(?<id>[^\/]+)$/,
+			regex: /^\/tenants\/(?<id>[^/]+)$/,
 			handler: (m: RegExpMatchArray): TenantId => {
 				const match = m.groups as TenantId
 				return {
 					...match,
-					resourceId
+					resourceId,
 				}
 			},
 		},
 		{
 			// Management Group
-			regex: /^\/providers\/Microsoft\.Management\/managementGroups\/(?<id>[^\/]+)$/,
+			regex: /^\/providers\/Microsoft\.Management\/managementGroups\/(?<id>[^/]+)$/,
 			handler: (m: RegExpMatchArray): ManagementGroupId => {
 				const match = m.groups as ManagementGroupId
 				return {
 					...match,
-					resourceId
+					resourceId,
 				}
 			},
 		},
 		{
 			// Subscription
-			regex: /^\/subscriptions\/(?<id>[^\/]+)$/,
+			regex: /^\/subscriptions\/(?<id>[^/]+)$/,
 			handler: (m: RegExpMatchArray): SubscriptionId => {
 				const match = m.groups as SubscriptionId
 				return {
 					...match,
-					resourceId
+					resourceId,
 				}
 			},
 		},
 		{
 			// Resource Group
-			regex: /^\/subscriptions\/(?<subscription>[^\/]+)\/resourceGroups\/(?<id>[^\/]+)$/,
+			regex: /^\/subscriptions\/(?<subscription>[^/]+)\/resourceGroups\/(?<id>[^/]+)$/,
 			handler: (m: RegExpMatchArray): ResourceGroupId => {
 				const match = m.groups as ResourceGroupId
 				return {
 					...match,
-					resourceId
+					resourceId,
 				}
 			},
 		},
 		{
 			// Resource
 			regex:
-				/^\/subscriptions\/(?<subscription>[^\/]+)\/resourceGroups\/(?<resourceGroup>[^\/]+)\/providers\/(?<provider>[^\/]+)\/(?<type>[^\/]+)\/(?<id>[^\/]+)$/,
+				/^\/subscriptions\/(?<subscription>[^/]+)\/resourceGroups\/(?<resourceGroup>[^/]+)\/providers\/(?<provider>[^/]+)\/(?<type>[^/]+)\/(?<id>[^/]+)$/,
 			handler: (m: RegExpMatchArray): ResourceId => {
 				const match = m.groups as ResourceId
 				return {
 					...match,
-					resourceId
+					resourceId,
 				}
 			},
 		},
 		{
 			// Child Resource
 			regex:
-				/^\/subscriptions\/(?<subscription>[^\/]+)\/resourceGroups\/(?<rg>[^\/]+)\/providers\/(?<provider>[^\/]+)\/(?<type>[^\/]+)\/(?<name>[^\/]+)\/(?<childType>[^\/]+)\/(?<id>[^\/]+)$/,
+				/^\/subscriptions\/(?<subscription>[^/]+)\/resourceGroups\/(?<rg>[^/]+)\/providers\/(?<provider>[^/]+)\/(?<type>[^/]+)\/(?<name>[^/]+)\/(?<childType>[^/]+)\/(?<id>[^/]+)$/,
 			handler: (m: RegExpMatchArray): ChildResourceId => {
 				const match = m.groups as ChildResourceId
 				return {
 					...match,
-					resourceId
+					resourceId,
 				}
 			},
 		},
