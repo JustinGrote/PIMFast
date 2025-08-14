@@ -3,11 +3,6 @@ import { AccountInfo } from '@azure/msal-browser'
 import { Client } from '@microsoft/microsoft-graph-client'
 import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials'
 import { AccountInfoTokenCredential } from './auth'
-import { isEmptyObject } from './util'
-
-type SubscriptionCache = {
-	subscriptions: Subscription[]
-}
 
 type TenantCache = {
 	tenants: TenantIdDescription[]
@@ -24,8 +19,11 @@ export type TenantInformation = {
 	tenantId: string
 }
 
-const graphClients: Map<string, Client> = new Map()
+type AccountInfoHomeId = AccountInfo['homeAccountId']
 
+const graphClients: Map<AccountInfoHomeId, Client> = new Map()
+
+/** Returns a singleton global client, per best practice */
 async function getGraphClient(account: AccountInfo): Promise<Client> {
 	const cacheKey = account.homeAccountId
 	let client: Client | undefined = graphClients.get(cacheKey)
@@ -36,6 +34,19 @@ async function getGraphClient(account: AccountInfo): Promise<Client> {
 			}),
 		})
 		graphClients.set(cacheKey, client)
+	}
+	return client
+}
+
+const subscriptionClients: Map<AccountInfoHomeId, SubscriptionClient> = new Map()
+
+/** Returns a singleton global client per account, per best practice */
+function getSubscriptionClient(account: AccountInfo): SubscriptionClient {
+	const cacheKey = account.homeAccountId
+	let client = subscriptionClients.get(cacheKey)
+	if (!client) {
+		client = new SubscriptionClient(new AccountInfoTokenCredential(account), {})
+		subscriptionClients.set(cacheKey, client)
 	}
 	return client
 }
@@ -57,36 +68,36 @@ export async function findTenantInformation(account: AccountInfo, tenantId: stri
 	return tenantInfo
 }
 
+const subscriptionCache: Record<AccountInfoHomeId, Subscription[]> = {}
 export async function fetchSubscriptions(account: AccountInfo, forceRefresh = false): Promise<Subscription[]> {
-	const key = 'subscriptions'
-	const client = new SubscriptionClient(new AccountInfoTokenCredential(account))
-	if (forceRefresh) {
-		await chrome.storage.session.remove(key)
+	const key = account.homeAccountId
+
+	if (subscriptionCache[key] && !forceRefresh) {
+		return subscriptionCache[key]
 	}
-	let subCache: SubscriptionCache = await chrome.storage.session.get(key)
-	if (!subCache?.subscriptions || isEmptyObject(subCache?.subscriptions)) {
-		const subscriptions = await Array.fromAsync(client.subscriptions.list())
-		subCache = { subscriptions }
-		console.debug('Fetched subscriptions for account:', account.username)
-		await chrome.storage.session.set(subCache)
-	}
-	return subCache.subscriptions
+
+	const client = getSubscriptionClient(account)
+
+	const subscriptions = await Array.fromAsync(client.subscriptions.list())
+	console.debug('Fetched subscriptions for account:', account.username)
+	subscriptionCache[key] = subscriptions
+	return subscriptionCache[key]
 }
 
+const tenantCache: Record<AccountInfoHomeId, TenantIdDescription[]> = {}
 export async function fetchTenants(account: AccountInfo, forceRefresh = false): Promise<TenantIdDescription[]> {
-	const key = 'tenants'
-	const client = new SubscriptionClient(new AccountInfoTokenCredential(account))
-	if (forceRefresh) {
-		await chrome.storage.session.remove(key)
+	const key = account.homeAccountId
+
+	if (tenantCache[key] && !forceRefresh) {
+		return tenantCache[key]
 	}
-	let tenantCache: TenantCache = await chrome.storage.session.get(key)
-	if (!tenantCache?.tenants || isEmptyObject(tenantCache?.tenants)) {
-		const tenants = await Array.fromAsync(client.tenants.list())
-		tenantCache = { tenants }
-		console.debug('Fetched tenants for account:', account.username)
-		await chrome.storage.session.set(tenantCache)
-	}
-	return tenantCache.tenants
+
+	const client = getSubscriptionClient(account)
+
+	const tenants = await Array.fromAsync(client.tenants.list())
+	console.debug('Fetched tenants for account:', account.username)
+	tenantCache[key] = tenants
+	return tenantCache[key]
 }
 
 /**
@@ -101,36 +112,35 @@ export async function fetchTenantNameBySubscriptionId(
 ): Promise<string | undefined> {
 	// Use fetchSubscriptions to get the subscription
 	const subscriptions = await fetchSubscriptions(account)
-	for (const sub of subscriptions) {
-		if (sub.subscriptionId === subscriptionId) {
-			if (!sub.tenantId) {
-				throw `Subscription ${subscriptionId} does not have a tenantId. This should not happen.`
-			}
-			const tenantId = sub.tenantId
-			// Use fetchTenants to find the tenant with this tenantId
-			for (const tenant of await fetchTenants(account)) {
-				const displayName = (tenant as any).displayName || (tenant as any).tenantDisplayName
-				if (tenant.tenantId === tenantId) {
-					return displayName
-				}
-			}
-			// If we don't find it there, try findTenantInformation
-			const tenantInfo = await findTenantInformation(account, tenantId)
-			return tenantInfo?.displayName
-		}
+	const subscription = subscriptions.find(({ subscriptionId: id }) => id === subscriptionId)
+	if (subscription === undefined) {
+		throw new Error(
+			`Subscription ${subscriptionId} not found in Account subscription list, so we can't get the tenant ID to find it`,
+		)
 	}
-	return undefined
-}
 
-export async function fetchTenantNameByResourceId(
-	account: AccountInfo,
-	resourceId: string,
-): Promise<string | undefined> {
-	const subscriptionId = parseSubscriptionIdFromResourceId(resourceId)
-	if (!subscriptionId) {
-		return undefined
+	// If the subscription has a tenantId, use it to find the tenant name
+	const { tenantId } = subscription
+
+	if (tenantId === undefined) {
+		throw new Error(`Subscription ${subscriptionId} does not have a tenantId, this is a bug and should not happen`)
 	}
-	return fetchTenantNameBySubscriptionId(account, subscriptionId)
+
+	// Use fetchTenants to find the tenant with this tenantId
+	const tenants = await fetchTenants(account)
+	const tenant = tenants.find(({ tenantId: id }) => id === tenantId)
+	if (tenant !== undefined) {
+		return tenant.displayName
+	}
+
+	// If we don't find it in cache, try findTenantInformation
+	console.debug(`Couldn't find tenant ${tenantId} in cache, fetching from API`)
+	const tenantInfo = await findTenantInformation(account, tenantId)
+	if (!tenantInfo) {
+		throw 'Failed to retrieve tenant information for tenantId: ' + tenantId
+	}
+
+	return tenantInfo.displayName
 }
 
 export function parseSubscriptionIdFromResourceId(resourceId: string): string | null {

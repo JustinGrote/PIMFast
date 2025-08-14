@@ -41,7 +41,7 @@ const msalInstance = new PublicClientApplication({
 			loggerCallback: (level, message, _) => {
 				console.log(`[MSAL] ${level}: ${message}`)
 			},
-			logLevel: LogLevel.Trace,
+			logLevel: LogLevel.Warning,
 			piiLoggingEnabled: true,
 		},
 	},

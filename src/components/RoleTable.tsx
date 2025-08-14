@@ -1,4 +1,4 @@
-import { fetchTenantNameByResourceId } from '@/common/subscriptions'
+import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
 import { RoleAssignmentScheduleRequest, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import {
@@ -40,14 +40,18 @@ interface AccountRoleEligibilityScheduleInstance {
 /** All the information required to activate a PIM eligible role */
 type EligibleRole = AccountRoleEligibilityScheduleInstance
 type EligibleRoleId = EligibleRole['id']
+type SubscriptionId = string
+type TenantDisplayName = string
 
 const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 	// Data State
 	const [accounts, setAccounts] = useState<AccountInfo[]>([])
-	/** Some eligible roles are in other tenants, so we want to display friendly names for these */
-	const tenantNameMap = new Map<EligibleRoleId, string>()
+	/** Some eligible roles are in other tenants, so we want to display friendly names for these, but the role doesn't have the tenant name, only the sub name, so we need to do some lookup and cache to keep this performant */
+	const subToTenantNameLookup = new Map<SubscriptionId, TenantDisplayName>()
+
+	const tenantNameMap = new Map<EligibleRoleId, TenantDisplayName>()
 	const [eligibleRoles, setEligibleRoles] = useState<EligibleRole[]>([])
-	/** Tracks state for role activations and refreshes the UI accordingly */
+	/** Tracks state for role activations and refreshs the UI accordingly */
 	const activationMap = useMap<EligibleRoleId, RoleAssignmentScheduleRequest>([])
 
 	// UI Hooks
@@ -65,6 +69,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 		requiresTicket: false,
 		maxActivationDuration: 8,
 	})
+	const [modalError, setModalError] = useState<string | null>(null)
 
 	const fetchEligibleRoles = async () => {
 		setLoadingRoles(true)
@@ -97,28 +102,55 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 			if (!eligibleRoles.length) return
 
 			for (const role of eligibleRoles) {
-				// These don't change (except if a subscription moves tenants which is rare) so we can cache them for the lifetime of the session.
+				const { account, schedule } = role
+
 				if (tenantNameMap.has(role.id)) continue
 
-				try {
-					const { account, schedule } = role
-					if (!schedule.scope) throw new Error('Missing schedule scope')
+				if (!schedule.scope) throw 'Schedule Doesnt have a scope. This is a bug and should not happen'
+				const subscriptionId = parseSubscriptionIdFromResourceId(schedule.scope)
+				if (!subscriptionId) throw new Error('Failed to parse subscription ID from schedule scope')
 
-					const tenantName = (await fetchTenantNameByResourceId(account, schedule.scope)) || 'Unknown'
-					tenantNameMap.set(role.id, tenantName)
-				} catch {
-					tenantNameMap.set(role.id, 'Unknown')
+				// Already discovered so skip, performance optimization
+				// This only changes rarely if a subscription is moved between tenants
+				if (subToTenantNameLookup.has(subscriptionId)) {
+					tenantNameMap.set(role.id, subToTenantNameLookup.get(subscriptionId)!)
+					continue
 				}
+
+				let tenantName: TenantDisplayName | undefined
+				console.debug(`Fetching tenant name for subscription ${subscriptionId} in account ${account.homeAccountId}`)
+
+				try {
+					tenantName = await fetchTenantNameBySubscriptionId(account, subscriptionId)
+				} catch (err) {
+					if (!(err instanceof Error)) throw err
+
+					// If we couldn't find the tenant name, we need to handle this case
+					console.warn(`Failed to fetch tenant name for subscription ${subscriptionId}: ${err.message}`)
+					continue
+				}
+
+				if (!tenantName) {
+					// If we couldn't find the tenant name, we need to handle this case
+					console.warn(`Tenant name for subscription ${subscriptionId} returned undefined`)
+					continue
+				}
+
+				console.debug(`Found tenant name "${tenantName}" for subscription ${subscriptionId}`)
+
+				subToTenantNameLookup.set(subscriptionId, tenantName)
+				tenantNameMap.set(role.id, tenantName)
 			}
 		}
 		fetchTenantNames()
 	}, [eligibleRoles])
 
-	async function handleActivateClick(eligibleRole: EligibleRole, _index?: number) {
+	async function handleActivateClick(eligibleRole: EligibleRole) {
 		setSelectedEligibleRoles([eligibleRole])
 		setJustification('')
 		setTicketNumber('')
 		setStartTime(new Date())
+		setModalError(null)
 
 		try {
 			if (eligibleRole.account) {
@@ -133,6 +165,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 			}
 		} catch (error) {
 			console.error('Error getting policy requirements:', error)
+			setModalError('Failed to load policy requirements. Please try again or contact support.')
 			// Set default end time (8 hours from now)
 			const defaultEndTime = new Date()
 			defaultEndTime.setHours(defaultEndTime.getHours() + 8)
@@ -143,26 +176,34 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 	}
 
 	async function handleModalActivateClick(eligibleRoles: EligibleRole[]) {
-		if (eligibleRoles.length === 0) return
-		if (eligibleRoles.length > 1) throw new Error('Multiple role activation is not yet supported')
+		setModalError(null)
+		try {
+			if (eligibleRoles.length === 0) return
+			if (eligibleRoles.length > 1) throw new Error('Multiple role activation is not yet supported')
 
-		const { account, schedule, id } = eligibleRoles[0]
-		if (!id) throw new Error('Missing eligible role ID')
+			const { account, schedule, id } = eligibleRoles[0]
+			if (!id) throw new Error('Missing eligible role ID')
 
-		// This will trigger a refresh that sets the loading to true. We put in a dummy ID until we have a real one from the API.
-		activationMap.set(id, { id: 'CREATING' })
-		const requestEndTime = endTime === null ? undefined : endTime
-		const activationRequest = await activateRole(
-			account,
-			schedule,
-			justification,
-			ticketNumber,
-			startTime,
-			requestEndTime,
-		)
+			// This will trigger a refresh that sets the loading to true. We put in a dummy ID until we have a real one from the API.
+			activationMap.set(id, { id: 'CREATING' })
+			const requestEndTime = endTime === null ? undefined : endTime
+			const activationRequest = await activateRole(
+				account,
+				schedule,
+				justification,
+				ticketNumber,
+				startTime,
+				requestEndTime,
+			)
 
-		// Update the activation map with the real request. This should trigger a UI refresh
-		activationMap.set(id, activationRequest)
+			// Update the activation map with the real request. This should trigger a UI refresh
+			activationMap.set(id, activationRequest)
+			setActivationModalOpen(false)
+			setNotification({ message: 'Role activation request submitted.', type: 'success' })
+		} catch (error: any) {
+			console.error('Error activating role:', error)
+			setModalError(error?.message || 'An unexpected error occurred during activation.')
+		}
 	}
 
 	return (
@@ -244,14 +285,20 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 									accessor: 'actions',
 									title: '',
 									width: '80',
-									render: (eligibleRole: EligibleRole, index: number) => (
+									render: (eligibleRole: EligibleRole) => (
 										<div className="one-line-row">
 											<Group gap={4} justify="right" wrap="nowrap">
 												<ActionIcon
 													size="sm"
 													variant="subtle"
 													color="green"
-													onClick={() => handleActivateClick(eligibleRole, index)}
+													onClick={() => handleActivateClick(eligibleRole)}
+													loading={
+														activationMap.has(eligibleRole.id) &&
+														!['CREATING', 'Revoked', 'Provisioned'].includes(
+															activationMap.get(eligibleRole.id)?.status ?? '',
+														)
+													}
 													loaderProps={{
 														color: 'blue',
 													}}
@@ -273,7 +320,10 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 			{/* Role Activation Modal */}
 			<Modal
 				opened={activationModalOpen}
-				onClose={() => setActivationModalOpen(false)}
+				onClose={() => {
+					setActivationModalOpen(false)
+					setModalError(null)
+				}}
 				title={
 					<Title order={3}>
 						Activate Role:
@@ -283,6 +333,12 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 				size="lg"
 			>
 				<Stack>
+					{modalError && (
+						<Notification color="red" title="Error" onClose={() => setModalError(null)} withCloseButton>
+							{modalError}
+						</Notification>
+					)}
+
 					<Text fw={600}>Scope: {'TODO'}</Text>
 
 					<Textarea

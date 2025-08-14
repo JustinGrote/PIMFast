@@ -161,39 +161,6 @@ export async function activateRole(
 	}
 }
 
-/** Parse an Azure Resource ID into its component parts. This works for resources only. */
-export type AzureResourceId = {
-	scope: string
-	id: string
-	subscription: string
-	resourceGroup: string
-	provider: string
-	type: string
-}
-
-export function parseResourceId(resourceId: string): AzureResourceId {
-	const match = resourceId.match(
-		/^\/subscriptions\/([^\/]+)\/resourceGroups\/([^\/]+)\/providers\/([^\/]+)\/([^\/]+)\/([^\/]+)$/,
-	)
-
-	if (!match) {
-		throw new Error(
-			'Invalid resource ID format. Expected format: /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProvider}/{resourceType}/{resourceId}',
-		)
-	}
-
-	const [, subscription, resourceGroup, provider, type, id] = match
-
-	return {
-		scope: `/subscriptions/${subscription}/resourceGroups/${resourceGroup}`,
-		id,
-		subscription,
-		resourceGroup,
-		provider,
-		type,
-	}
-}
-
 /**
  * Gets the status of a role eligibility schedule request.
  * @param account The account info.
@@ -206,7 +173,10 @@ export async function getRoleAssignmentScheduleRequest(
 	try {
 		const pimClient = getPimClient(account)
 
-		const { scope, id } = parseResourceId(requestId)
+		const lastSlash = requestId.lastIndexOf('/')
+		const scope = requestId.substring(0, lastSlash)
+		const id = requestId.substring(lastSlash + 1)
+
 		const response = await pimClient.roleAssignmentScheduleRequests.get(scope, id)
 
 		console.debug(`Role Assignment Schedule Request ${response.id} is ${response.status}`)
