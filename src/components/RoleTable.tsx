@@ -277,15 +277,13 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 				title={
 					<Title order={3}>
 						Activate Role:
-						{selectedEligibleRoles[0].schedule.expandedProperties?.roleDefinition?.displayName ?? 'Unknown'}
+						{'TODO'} {/* FIXME: Display role name */}
 					</Title>
 				}
 				size="lg"
 			>
 				<Stack>
-					<Text fw={600}>
-						Scope: {selectedEligibleRoles[0].schedule.expandedProperties?.scope?.displayName ?? 'Unknown'}
-					</Text>
+					<Text fw={600}>Scope: {'TODO'}</Text>
 
 					<Textarea
 						label="Justification"
