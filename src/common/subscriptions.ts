@@ -4,10 +4,6 @@ import { Client } from '@microsoft/microsoft-graph-client'
 import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials'
 import { AccountInfoTokenCredential } from './auth'
 
-type TenantCache = {
-	tenants: TenantIdDescription[]
-}
-
 export type TenantInformation = {
 	/** Primary domain name of a Microsoft Entra tenant. */
 	defaultDomainName: string
@@ -71,13 +67,8 @@ export async function findTenantInformation(account: AccountInfo, tenantId: stri
 const subscriptionCache: Record<AccountInfoHomeId, Subscription[]> = {}
 export async function fetchSubscriptions(account: AccountInfo, forceRefresh = false): Promise<Subscription[]> {
 	const key = account.homeAccountId
-
-	if (subscriptionCache[key] && !forceRefresh) {
-		return subscriptionCache[key]
-	}
-
+	if (subscriptionCache[key] && !forceRefresh) return subscriptionCache[key]
 	const client = getSubscriptionClient(account)
-
 	const subscriptions = await Array.fromAsync(client.subscriptions.list())
 	console.debug('Fetched subscriptions for account:', account.username)
 	subscriptionCache[key] = subscriptions
@@ -114,9 +105,7 @@ export async function fetchTenantNameBySubscriptionId(
 	const subscriptions = await fetchSubscriptions(account)
 	const subscription = subscriptions.find(({ subscriptionId: id }) => id === subscriptionId)
 	if (subscription === undefined) {
-		throw new Error(
-			`Subscription ${subscriptionId} not found in Account subscription list, so we can't get the tenant ID to find it`,
-		)
+		return '[Unknown] - No Read Rights to Scope'
 	}
 
 	// If the subscription has a tenantId, use it to find the tenant name

@@ -34,18 +34,35 @@ export default function App() {
 	}
 
 	return (
-		<Container size="sm" py="md">
-			<Card shadow="sm" p="lg" radius="md" withBorder>
+		<Container
+			size="sm"
+			py="md"
+		>
+			<Card
+				shadow="sm"
+				p="lg"
+				radius="md"
+				withBorder
+			>
 				<Stack>
 					<Group justify="center">
 						<Title order={1}>PIM Fast</Title>
 					</Group>
-					<Text c="dimmed" size="sm" ta="center">
+					<Text
+						c="dimmed"
+						size="sm"
+						ta="center"
+					>
 						Azure Privileged Identity Management
 					</Text>
 
 					{error && (
-						<Alert icon={<IconAlertCircle size={16} />} title="Authentication Error" color="red" variant="filled">
+						<Alert
+							icon={<IconAlertCircle size={16} />}
+							title="Authentication Error"
+							color="red"
+							variant="filled"
+						>
 							{error}
 						</Alert>
 					)}
@@ -72,14 +89,20 @@ export default function App() {
 							>
 								{isLoading ? (
 									<Group gap="xs">
-										<Loader color="white" size="xs" />
+										<Loader
+											color="white"
+											size="xs"
+										/>
 										<span>Authenticating...</span>
 									</Group>
 								) : (
 									'Authenticate with Azure'
 								)}
 							</Button>
-							<Text size="xs" c="dimmed">
+							<Text
+								size="xs"
+								c="dimmed"
+							>
 								This extension requires Azure Management API access to manage your PIM roles.
 							</Text>
 						</Stack>

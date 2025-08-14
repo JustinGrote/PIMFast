@@ -20,15 +20,11 @@ import { useMap } from '@mantine/hooks'
 import { IconCheck, IconPlayerPlay, IconQuestionMark, IconRefresh, IconX } from '@tabler/icons-react'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import { DataTable } from 'mantine-datatable'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
 import { activateRole, getPolicyRequirements, getRoleEligibilityScheduleInstances } from '../common/pim'
 import './RoleTable.css'
-
-interface RoleTableProps {
-	onRefresh?: () => void
-}
 
 /** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
 interface AccountRoleEligibilityScheduleInstance {
@@ -43,13 +39,13 @@ type EligibleRoleId = EligibleRole['id']
 type SubscriptionId = string
 type TenantDisplayName = string
 
-const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
+function RoleTable() {
 	// Data State
 	const [accounts, setAccounts] = useState<AccountInfo[]>([])
 	/** Some eligible roles are in other tenants, so we want to display friendly names for these, but the role doesn't have the tenant name, only the sub name, so we need to do some lookup and cache to keep this performant */
 	const subToTenantNameLookup = new Map<SubscriptionId, TenantDisplayName>()
 
-	const tenantNameMap = new Map<EligibleRoleId, TenantDisplayName>()
+	const tenantNameMap = useMap<EligibleRoleId, TenantDisplayName>()
 	const [eligibleRoles, setEligibleRoles] = useState<EligibleRole[]>([])
 	/** Tracks state for role activations and refreshs the UI accordingly */
 	const activationMap = useMap<EligibleRoleId, RoleAssignmentScheduleRequest>([])
@@ -93,55 +89,56 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 		}
 	}
 
+	const fetchTenantNames = async () => {
+		if (!eligibleRoles.length) return
+
+		for (const role of eligibleRoles) {
+			const { account, schedule } = role
+
+			if (tenantNameMap.has(role.id)) continue
+
+			if (!schedule.scope) throw 'Schedule Doesnt have a scope. This is a bug and should not happen'
+			const subscriptionId = parseSubscriptionIdFromResourceId(schedule.scope)
+			if (!subscriptionId) throw new Error('Failed to parse subscription ID from schedule scope')
+
+			// Already discovered so skip, performance optimization
+			// This only changes rarely if a subscription is moved between tenants
+			if (subToTenantNameLookup.has(subscriptionId)) {
+				tenantNameMap.set(role.id, subToTenantNameLookup.get(subscriptionId)!)
+				continue
+			}
+
+			let tenantName: TenantDisplayName | undefined
+			console.debug(`Fetching tenant name for subscription ${subscriptionId} in account ${account.homeAccountId}`)
+
+			try {
+				tenantName = await fetchTenantNameBySubscriptionId(account, subscriptionId)
+			} catch (err) {
+				if (!(err instanceof Error)) throw err
+
+				// If we couldn't find the tenant name, we need to handle this case
+				console.warn(`Failed to fetch tenant name for subscription ${subscriptionId}: ${err.message}`)
+				continue
+			}
+
+			if (!tenantName) {
+				// If we couldn't find the tenant name, we need to handle this case
+				console.warn(`Tenant name for subscription ${subscriptionId} returned undefined`)
+				continue
+			}
+
+			console.debug(`Found tenant name "${tenantName}" for subscription ${subscriptionId}`)
+
+			subToTenantNameLookup.set(subscriptionId, tenantName)
+			tenantNameMap.set(role.id, tenantName)
+		}
+	}
+
 	useEffect(() => {
 		fetchEligibleRoles()
-	}, [onRefresh])
+	}, [])
 
 	useEffect(() => {
-		const fetchTenantNames = async () => {
-			if (!eligibleRoles.length) return
-
-			for (const role of eligibleRoles) {
-				const { account, schedule } = role
-
-				if (tenantNameMap.has(role.id)) continue
-
-				if (!schedule.scope) throw 'Schedule Doesnt have a scope. This is a bug and should not happen'
-				const subscriptionId = parseSubscriptionIdFromResourceId(schedule.scope)
-				if (!subscriptionId) throw new Error('Failed to parse subscription ID from schedule scope')
-
-				// Already discovered so skip, performance optimization
-				// This only changes rarely if a subscription is moved between tenants
-				if (subToTenantNameLookup.has(subscriptionId)) {
-					tenantNameMap.set(role.id, subToTenantNameLookup.get(subscriptionId)!)
-					continue
-				}
-
-				let tenantName: TenantDisplayName | undefined
-				console.debug(`Fetching tenant name for subscription ${subscriptionId} in account ${account.homeAccountId}`)
-
-				try {
-					tenantName = await fetchTenantNameBySubscriptionId(account, subscriptionId)
-				} catch (err) {
-					if (!(err instanceof Error)) throw err
-
-					// If we couldn't find the tenant name, we need to handle this case
-					console.warn(`Failed to fetch tenant name for subscription ${subscriptionId}: ${err.message}`)
-					continue
-				}
-
-				if (!tenantName) {
-					// If we couldn't find the tenant name, we need to handle this case
-					console.warn(`Tenant name for subscription ${subscriptionId} returned undefined`)
-					continue
-				}
-
-				console.debug(`Found tenant name "${tenantName}" for subscription ${subscriptionId}`)
-
-				subToTenantNameLookup.set(subscriptionId, tenantName)
-				tenantNameMap.set(role.id, tenantName)
-			}
-		}
 		fetchTenantNames()
 	}, [eligibleRoles])
 
@@ -208,9 +205,16 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 
 	return (
 		<>
-			<Paper shadow="xs" p="md" mt="xl">
+			<Paper
+				shadow="xs"
+				p="md"
+				mt="xl"
+			>
 				<Stack>
-					<Group justify="space-between" align="center">
+					<Group
+						justify="space-between"
+						align="center"
+					>
 						<Title order={2}>Eligible Roles</Title>
 						<Button
 							onClick={fetchEligibleRoles}
@@ -224,7 +228,10 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 					</Group>
 
 					{loadingRoles ? (
-						<Group justify="center" p="xl">
+						<Group
+							justify="center"
+							p="xl"
+						>
 							<Loader size="md" />
 							<Text>Loading role schedules...</Text>
 						</Group>
@@ -245,8 +252,11 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 								{
 									accessor: 'roleDefinition',
 									title: 'Role',
-									render: (eligibleRole) => (
-										<span className="one-line-row" title={eligibleRole.schedule.roleDefinitionId || ''}>
+									render: eligibleRole => (
+										<span
+											className="one-line-row"
+											title={eligibleRole.schedule.roleDefinitionId || ''}
+										>
 											{eligibleRole.schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
 										</span>
 									),
@@ -264,7 +274,10 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 										return (
 											<span className="one-line-row">
 												{icon}
-												<span className="one-line-text" title={schedule.scope ?? ''}>
+												<span
+													className="one-line-text"
+													title={schedule.scope ?? ''}
+												>
 													{schedule.expandedProperties?.scope?.displayName ?? 'unknown'}
 												</span>
 											</span>
@@ -274,7 +287,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 								{
 									accessor: 'tenant',
 									title: 'Tenant',
-									render: (eligibleRole) => {
+									render: eligibleRole => {
 										const { schedule } = eligibleRole
 										if (!schedule.scope) return <span className="one-line-row">Unknown</span>
 										const tenantName = tenantNameMap.get(eligibleRole.id) || 'Unknown'
@@ -287,7 +300,11 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 									width: '80',
 									render: (eligibleRole: EligibleRole) => (
 										<div className="one-line-row">
-											<Group gap={4} justify="right" wrap="nowrap">
+											<Group
+												gap={4}
+												justify="right"
+												wrap="nowrap"
+											>
 												<ActionIcon
 													size="sm"
 													variant="subtle"
@@ -334,7 +351,12 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 			>
 				<Stack>
 					{modalError && (
-						<Notification color="red" title="Error" onClose={() => setModalError(null)} withCloseButton>
+						<Notification
+							color="red"
+							title="Error"
+							onClose={() => setModalError(null)}
+							withCloseButton
+						>
 							{modalError}
 						</Notification>
 					)}
@@ -345,7 +367,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 						label="Justification"
 						placeholder="Enter reason for activation"
 						value={justification}
-						onChange={(e) => setJustification(e.currentTarget.value)}
+						onChange={e => setJustification(e.currentTarget.value)}
 						required={policyRequirements.requiresJustification}
 						minRows={3}
 					/>
@@ -355,7 +377,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 							label="Ticket Number"
 							placeholder="Enter ticket or case number"
 							value={ticketNumber}
-							onChange={(e) => setTicketNumber(e.currentTarget.value)}
+							onChange={e => setTicketNumber(e.currentTarget.value)}
 							required
 						/>
 					)}
@@ -365,7 +387,7 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 							label="Ticket Number (optional)"
 							placeholder="Enter ticket or case number if applicable"
 							value={ticketNumber}
-							onChange={(e) => setTicketNumber(e.currentTarget.value)}
+							onChange={e => setTicketNumber(e.currentTarget.value)}
 						/>
 					)}
 
@@ -389,7 +411,10 @@ const RoleTable: React.FC<RoleTableProps> = ({ onRefresh }) => {
 						clearable
 					/>
 
-					<Group justify="flex-end" mt="md">
+					<Group
+						justify="flex-end"
+						mt="md"
+					>
 						<Button
 							variant="outline"
 							color="gray"
