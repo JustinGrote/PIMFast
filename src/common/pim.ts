@@ -118,7 +118,7 @@ export async function activateRole(
 	justification: string,
 	ticketNumber?: string,
 	startTime?: Date,
-	endTime?: Date,
+	duration?: string,
 ) {
 	try {
 		if (!scheduleInstance.scope || !scheduleInstance.roleDefinitionId || !scheduleInstance.principalId) {
@@ -136,8 +136,8 @@ export async function activateRole(
 			scheduleInfo: {
 				startDateTime: startTime || new Date(),
 				expiration: {
-					type: 'AfterDateTime',
-					endDateTime: endTime,
+					type: 'AfterDuration',
+					duration: duration || 'PT5M',
 				},
 			},
 			justification,

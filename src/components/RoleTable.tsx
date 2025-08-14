@@ -64,8 +64,6 @@ function RoleTable() {
 	const [justification, setJustification] = useState('')
 	const [ticketNumber, setTicketNumber] = useState('')
 	const [startTime, setStartTime] = useState<Date>(new Date())
-	const [endTime, setEndTime] = useState<Date | null>(null)
-	const [activating, _setActivating] = useState(false)
 	const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 	const [policyRequirements, setPolicyRequirements] = useState({
 		requiresJustification: true,
@@ -181,21 +179,17 @@ function RoleTable() {
 
 			// This will trigger a refresh that sets the loading to true. We put in a dummy ID until we have a real one from the API.
 			activationMap.set(id, { id: 'CREATING' })
-			const requestEndTime = endTime === null ? undefined : endTime
-			const activationRequest = await activateRole(
-				account,
-				schedule,
-				justification,
-				ticketNumber,
-				startTime,
-				requestEndTime,
-			)
+			const duration = 'PT5M'
+			const activationRequest = await activateRole(account, schedule, justification, ticketNumber, startTime, duration)
 
 			// Update the activation map with the real request. This should trigger a UI refresh
 			activationMap.set(id, activationRequest)
 			setActivationModalOpen(false)
 			setNotification({ message: 'Role activation request submitted.', type: 'success' })
-		} catch (error: any) {
+		} catch (error: unknown) {
+			if (!(error instanceof Error)) {
+				throw error
+			}
 			console.error('Error activating role:', error)
 			setModalError(error?.message || 'An unexpected error occurred during activation.')
 		}
@@ -444,7 +438,6 @@ function RoleTable() {
 									)
 								handleModalActivateClick(selectedEligibleRoles)
 							}}
-							loading={activating}
 							disabled={policyRequirements.requiresJustification && !justification}
 							leftSection={<IconCheck size={16} />}
 						>
