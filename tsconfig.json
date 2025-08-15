@@ -15,8 +15,7 @@
     "allowImportingTsExtensions": true,
     "strict": true,
     "noFallthroughCasesInSwitch": true,
-    "noUnusedLocals": false, // ESLint will do this work
-    "noUnusedParameters": true,
+    "importsNotUsedAsValues": "error",
     "noEmit": true,
     "isolatedModules": true,
     "skipLibCheck": true,
