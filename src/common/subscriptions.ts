@@ -2,7 +2,7 @@ import { Subscription, SubscriptionClient, TenantIdDescription } from '@azure/ar
 import { AccountInfo } from '@azure/msal-browser'
 import { Client } from '@microsoft/microsoft-graph-client'
 import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials'
-import { AccountInfoTokenCredential } from './auth'
+import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
 
 export type TenantInformation = {
 	/** Primary domain name of a Microsoft Entra tenant. */
@@ -14,8 +14,6 @@ export type TenantInformation = {
 	/** Unique identifier of a Microsoft Entra tenant. */
 	tenantId: string
 }
-
-type AccountInfoHomeId = AccountInfo['homeAccountId']
 
 const graphClients: Map<AccountInfoHomeId, Client> = new Map()
 
@@ -64,15 +62,10 @@ export async function findTenantInformation(account: AccountInfo, tenantId: stri
 	return tenantInfo
 }
 
-const subscriptionCache: Record<AccountInfoHomeId, Subscription[]> = {}
 export async function fetchSubscriptions(account: AccountInfo, forceRefresh = false): Promise<Subscription[]> {
-	const key = account.homeAccountId
-	if (subscriptionCache[key] && !forceRefresh) return subscriptionCache[key]
 	const client = getSubscriptionClient(account)
 	const subscriptions = await Array.fromAsync(client.subscriptions.list())
-	console.debug('Fetched subscriptions for account:', account.username)
-	subscriptionCache[key] = subscriptions
-	return subscriptionCache[key]
+	return subscriptions
 }
 
 const tenantCache: Record<AccountInfoHomeId, TenantIdDescription[]> = {}

@@ -1,6 +1,3 @@
-import '@mantine/core/styles.css'
-import '@mantine/dates/styles.css'
-
 // console.log('[CRXJS] Hello world from content script!')
 
 // const theme = createTheme({

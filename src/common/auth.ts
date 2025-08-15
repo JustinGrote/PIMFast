@@ -7,6 +7,8 @@ import {
 	PublicClientApplication,
 } from '@azure/msal-browser'
 
+export type AccountInfoHomeId = AccountInfo['homeAccountId']
+
 // These are the authorization scopes required for our tasks
 export const scopesGraphAndAzure = [
 	'https://management.azure.com/user_impersonation',

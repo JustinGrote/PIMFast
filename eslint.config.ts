@@ -4,4 +4,7 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config({
 	extends: [eslint.configs.recommended, tseslint.configs.recommended, eslintConfigPrettier],
+	rules: {
+		'@typescript-eslint/no-unused-vars': 'warn',
+	},
 })

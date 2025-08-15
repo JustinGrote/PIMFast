@@ -4,59 +4,35 @@ import {
 	RoleEligibilityScheduleInstance,
 } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
-import { AccountInfoTokenCredential } from './auth'
+import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
 
 // Scoping to subscription is not needed for the client as we will do it in our requests
 const UNSPECIFIED_SUBSCRIPTION_ID = '00000000-0000-0000-0000-000000000000'
 
-let pimClient: AuthorizationManagementClient
+const pimClients: Map<AccountInfoHomeId, AuthorizationManagementClient> = new Map()
 
 /**
  * Returns a singleton AuthorizationManagementClient for the app per best practice
  * @param account The account info.
  */
 function getPimClient(account: AccountInfo) {
-	if (!pimClient) {
-		const credential = new AccountInfoTokenCredential(account)
-		pimClient = new AuthorizationManagementClient(credential, UNSPECIFIED_SUBSCRIPTION_ID)
+	const cacheKey = account.homeAccountId
+	let client: AuthorizationManagementClient | undefined = pimClients.get(cacheKey)
+	if (!client) {
+		client = new AuthorizationManagementClient(new AccountInfoTokenCredential(account), UNSPECIFIED_SUBSCRIPTION_ID)
+		pimClients.set(cacheKey, client)
 	}
-	return pimClient
+	return client
 }
 
-export async function* getRoleEligibilitySchedules(account: AccountInfo, scope: string = '') {
-	try {
-		const pimClient = getPimClient(account)
-
-		const roleScheduleIterators = []
-		// asTarget() is needed or else elevated permissions are required
-		roleScheduleIterators.push(pimClient.roleEligibilitySchedules.listForScope(scope, { filter: 'asTarget()' }))
-
-		for await (const iterator of roleScheduleIterators) {
-			for await (const roleSchedule of iterator) {
-				console.debug(`Fetched Role Schedule: ${roleSchedule.scope} [${roleSchedule.name}]`)
-				yield roleSchedule
-			}
-		}
-	} catch (err) {
-		console.error('Error in getRoleEligibilitySchedules:', err)
-	}
+export async function getRoleEligibilitySchedules(account: AccountInfo, scope: string = '') {
+	return getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: 'asTarget()' })
 }
-export async function* getRoleEligibilityScheduleInstances(account: AccountInfo, scope: string = '') {
-	try {
-		const pimClient = getPimClient(account)
 
-		const roleScheduleIterators = []
-		roleScheduleIterators.push(pimClient.roleEligibilityScheduleInstances.listForScope(scope, { filter: 'asTarget()' }))
-
-		for await (const iterator of roleScheduleIterators) {
-			for await (const roleSchedule of iterator) {
-				console.debug(`Fetched Role Schedule: ${roleSchedule.scope} [${roleSchedule.name}]`)
-				yield roleSchedule
-			}
-		}
-	} catch (err) {
-		console.error('Error in getRoleEligibilitySchedules:', err)
-	}
+/** Represents roles that can currently be activated right now */
+export function getRoleEligibilityScheduleInstances(account: AccountInfo, scope: string = '') {
+	const iterator = getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: 'asTarget()' })
+	return iterator
 }
 
 export async function getRoleManagementPolicyAssignments(
