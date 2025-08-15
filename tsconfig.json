@@ -15,7 +15,6 @@
     "allowImportingTsExtensions": true,
     "strict": true,
     "noFallthroughCasesInSwitch": true,
-    "importsNotUsedAsValues": "error",
     "noEmit": true,
     "isolatedModules": true,
     "skipLibCheck": true,

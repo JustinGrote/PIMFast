@@ -1,12 +1,12 @@
 import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
+import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { RoleAssignmentScheduleRequest, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Stack, Title } from '@mantine/core'
-import { useDisclosure, useMap } from '@mantine/hooks'
+import { useMap } from '@mantine/hooks'
 import { IconClick, IconPlayerPlay, IconQuestionMark, IconRefresh } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
-import { RoleActivationForm } from '@/components/RoleActivationForm'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
@@ -34,7 +34,7 @@ type SubscriptionId = string
 type TenantDisplayName = string
 
 function RoleTable() {
-	const [isActivationModalOpen, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
+	const [activationModalOpened, setActivationModalOpened] = useState(false)
 	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
 
 	const accountsQuery = useQuery<AccountInfo[]>({
@@ -135,7 +135,7 @@ function RoleTable() {
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
 		setSelectedRole(eligibleRole)
-		openActivationModal()
+		setActivationModalOpened(true)
 	}
 
 	return (
@@ -184,10 +184,7 @@ function RoleTable() {
 								accessor: 'roleDefinition',
 								title: 'Role',
 								render: eligibleRole => (
-									<span
-										className="one-line-row"
-										title={eligibleRole.schedule.roleDefinitionId || ''}
-									>
+									<span title={eligibleRole.schedule.roleDefinitionId || ''}>
 										{eligibleRole.schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
 									</span>
 								),
@@ -203,15 +200,12 @@ function RoleTable() {
 										.otherwise(() => <IconQuestionMark />)
 
 									return (
-										<span className="one-line-row">
+										<Group wrap="nowrap">
 											{icon}
-											<span
-												className="one-line-text"
-												title={schedule.scope ?? ''}
-											>
+											<span title={schedule.scope ?? ''}>
 												{schedule.expandedProperties?.scope?.displayName ?? 'unknown'}
 											</span>
-										</span>
+										</Group>
 									)
 								},
 							},
@@ -220,9 +214,9 @@ function RoleTable() {
 								title: 'Tenant',
 								render: eligibleRole => {
 									const { schedule } = eligibleRole
-									if (!schedule.scope) return <span className="one-line-row">Unknown</span>
+									if (!schedule.scope) return <span>Unknown</span>
 									const tenantName = tenantNameMap.get(eligibleRole.id) || 'Unknown'
-									return <span className="one-line-row">{tenantName || 'Unknown'}</span>
+									return <span>{tenantName || 'Unknown'}</span>
 								},
 							},
 							{
@@ -276,17 +270,12 @@ function RoleTable() {
 			</Paper>
 
 			<Modal
-				opened={isActivationModalOpen}
-				onClose={closeActivationModal}
+				opened={activationModalOpened}
+				onClose={() => setActivationModalOpened(false)}
 				title="Activate Role"
 				size="lg"
 			>
-				{selectedRole && (
-					<RoleActivationForm
-						eligibleRole={selectedRole}
-						onClose={closeActivationModal}
-					/>
-				)}
+				{selectedRole && <RoleActivationForm eligibleRole={selectedRole} />}
 			</Modal>
 		</>
 	)

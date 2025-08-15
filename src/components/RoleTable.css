@@ -1,33 +1,3 @@
-.roleTable .one-line-row,
-.roleTable .one-line-text,
-.roleTable .one-line-checkbox,
-.roleTable .one-line-button {
-	display: inline-flex;
-	align-items: center;
+.roleTable .mantine-Table-td {
 	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	vertical-align: middle;
-}
-
-.roleTable .one-line-row {
-	width: 100%;
-	min-width: 0;
-}
-
-.roleTable .one-line-text {
-	margin-left: 0.5em;
-	min-width: 0;
-	flex: 1 1 auto;
-}
-
-.roleTable .one-line-checkbox {
-	margin-right: 0.5em;
-}
-
-.roleTable .one-line-button {
-	margin-left: 0.5em;
-	height: 1.5rem;
-	padding: 0 0.3rem;
-	line-height: 1;
 }

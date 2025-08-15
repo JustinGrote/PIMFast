@@ -134,55 +134,6 @@ export async function getPolicyRequirements(_account: AccountInfo, _schedule: Ro
 	}
 }
 
-export async function activateRole(
-	account: AccountInfo,
-	scheduleInstance: RoleEligibilityScheduleInstance,
-	justification: string,
-	ticketNumber?: string,
-	startTime?: Date,
-	duration?: string,
-) {
-	try {
-		if (!scheduleInstance.scope || !scheduleInstance.roleDefinitionId || !scheduleInstance.principalId) {
-			throw new Error('Schedule is missing required properties')
-		}
-
-		const pimClient = getPimClient(account)
-
-		// Create a role assignment schedule request (activation)
-		const requestProperties: RoleAssignmentScheduleRequest = {
-			linkedRoleEligibilityScheduleId: scheduleInstance.roleEligibilityScheduleId,
-			principalId: account.localAccountId,
-			roleDefinitionId: scheduleInstance.roleDefinitionId,
-			requestType: 'SelfActivate',
-			scheduleInfo: {
-				startDateTime: startTime || new Date(),
-				expiration: {
-					type: 'AfterDuration',
-					duration: duration || 'PT5M',
-				},
-			},
-			justification,
-			ticketInfo: ticketNumber ? { ticketNumber } : undefined,
-		}
-
-		// Generate a unique name for the request using a UUID
-		const requestName = crypto.randomUUID()
-
-		const request = await pimClient.roleAssignmentScheduleRequests.create(
-			scheduleInstance.scope,
-			requestName,
-			requestProperties,
-		)
-
-		console.debug(`Created Role Activation Request: ${request.id}`)
-		return request
-	} catch (err) {
-		console.error('Error in createRoleActivationRequest:', err)
-		throw err
-	}
-}
-
 /**
  * Gets the status of a role eligibility schedule request.
  * @param account The account info.
