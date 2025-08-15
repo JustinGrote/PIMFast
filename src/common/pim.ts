@@ -1,5 +1,6 @@
 import {
 	AuthorizationManagementClient,
+	RoleAssignmentScheduleInstance,
 	RoleAssignmentScheduleRequest,
 	RoleEligibilityScheduleInstance,
 } from '@azure/arm-authorization'
@@ -25,14 +26,59 @@ function getPimClient(account: AccountInfo) {
 	return client
 }
 
-export async function getRoleEligibilitySchedules(account: AccountInfo, scope: string = '') {
+export async function getMyRoleEligibilitySchedules(account: AccountInfo, scope: string = '') {
 	return getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: 'asTarget()' })
 }
 
 /** Represents roles that can currently be activated right now */
-export function getRoleEligibilityScheduleInstances(account: AccountInfo, scope: string = '') {
+export function getMyRoleEligibilityScheduleInstances(account: AccountInfo, scope: string = '') {
 	const iterator = getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: 'asTarget()' })
 	return iterator
+}
+
+export function getMyRoleAssignmentScheduleRequests(account: AccountInfo, scope: string = '') {
+	return getPimClient(account).roleAssignmentScheduleRequests.listForScope(scope, { filter: 'asTarget()' })
+}
+
+export function filterActivatedRoles(assignment: RoleAssignmentScheduleInstance[]) {
+	return assignment.filter(assignment => assignment.assignmentType === 'Activated')
+}
+
+export function getEligibleRoleStatus(
+	eligibleRole: RoleEligibilityScheduleInstance,
+	activations: RoleAssignmentScheduleInstance[] = [],
+	requests: RoleAssignmentScheduleRequest[] = [],
+) {
+	// First check if role is activated. This should be a 1:1 relationship to the schedule, PIM prevents multiple activations
+	const activeActivation = activations.find(a => a.linkedRoleEligibilityScheduleInstanceId === eligibleRole.id)
+	if (activeActivation)
+		return {
+			schedule: eligibleRole,
+			assignmentOrRequest: activeActivation,
+			status: activeActivation.status,
+		}
+
+	const sortedActivationRequests = requests
+		.filter(request => request.linkedRoleEligibilityScheduleId === eligibleRole.id)
+
+		// Sort by newest created
+		// TODO: Some more nuance probably needed here, like for failed requests
+		.sort(({ createdOn: a }, { createdOn: b }) => (b?.getTime() ?? 0) - (a?.getTime() ?? 0))
+
+	const mostRecentActivationRequest = sortedActivationRequests.length > 0 ? sortedActivationRequests[0] : undefined
+
+	if (mostRecentActivationRequest) {
+		return {
+			schedule: eligibleRole,
+			assignmentOrRequest: mostRecentActivationRequest,
+			status: mostRecentActivationRequest.status,
+		}
+	}
+	return {
+		schedule: eligibleRole,
+		assignmentOrRequest: undefined,
+		status: 'Idle',
+	}
 }
 
 export async function getRoleManagementPolicyAssignments(
@@ -146,22 +192,11 @@ export async function getRoleAssignmentScheduleRequest(
 	account: AccountInfo,
 	requestId: RoleAssignmentScheduleRequestId,
 ) {
-	try {
-		const pimClient = getPimClient(account)
+	const lastSlash = requestId.lastIndexOf('/')
+	const scope = requestId.substring(0, lastSlash)
+	const id = requestId.substring(lastSlash + 1)
 
-		const lastSlash = requestId.lastIndexOf('/')
-		const scope = requestId.substring(0, lastSlash)
-		const id = requestId.substring(lastSlash + 1)
-
-		const response = await pimClient.roleAssignmentScheduleRequests.get(scope, id)
-
-		console.debug(`Role Assignment Schedule Request ${response.id} is ${response.status}`)
-
-		return response
-	} catch (err) {
-		console.error('Error in getRoleEligibilityScheduleRequestStatus:', err)
-		throw err
-	}
+	return getPimClient(account).roleAssignmentScheduleRequests.get(scope, id)
 }
 
 // These types are useful for uniquely identifying these items without using their objects

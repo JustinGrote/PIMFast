@@ -1,9 +1,9 @@
 import { getAllAccounts, logout } from '@/common/auth'
 import { AccountInfo } from '@azure/msal-browser'
-import { useEffect, useState } from 'react'
-import { ActionIcon, Text, Group, Tooltip } from '@mantine/core'
+import { ActionIcon, Group, Text, Tooltip } from '@mantine/core'
 import { IconX } from '@tabler/icons-react'
 import { DataTable } from 'mantine-datatable'
+import { useEffect, useState } from 'react'
 
 interface AccountTableProps {
 	onNoAccounts?: () => void
@@ -61,9 +61,16 @@ export default function AccountTable({ onNoAccounts }: AccountTableProps) {
 					title: '',
 					textAlign: 'right',
 					render: (account: AccountInfo) => (
-						<Group gap="xs" justify="flex-end">
+						<Group
+							gap="xs"
+							justify="flex-end"
+						>
 							<Tooltip label="Sign out">
-								<ActionIcon color="red" variant="subtle" onClick={() => handleSignOutAccount(account)}>
+								<ActionIcon
+									color="red"
+									variant="subtle"
+									onClick={() => handleSignOutAccount(account)}
+								>
 									<IconX size={16} />
 								</ActionIcon>
 							</Tooltip>

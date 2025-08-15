@@ -28,7 +28,12 @@ import { DataTable } from 'mantine-datatable'
 import { useEffect, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
-import { activateRole, getPolicyRequirements, getRoleEligibilityScheduleInstances } from '../common/pim'
+import {
+	activateRole,
+	getMyRoleAssignmentScheduleRequests,
+	getMyRoleEligibilityScheduleInstances,
+	getPolicyRequirements,
+} from '../common/pim'
 import './RoleTable.css'
 
 dayjs.extend(durationPlugin)
@@ -42,7 +47,7 @@ interface AccountRoleEligibilityScheduleInstance {
 	id: string
 }
 /** All the information required to activate a PIM eligible role */
-type EligibleRole = AccountRoleEligibilityScheduleInstance
+export type EligibleRole = AccountRoleEligibilityScheduleInstance
 type EligibleRoleId = EligibleRole['id']
 type SubscriptionId = string
 type TenantDisplayName = string
@@ -61,7 +66,7 @@ function RoleTable() {
 			const accounts = accountsQuery.data ?? []
 			const allEligibleRoles: EligibleRole[] = []
 			for (const account of accounts) {
-				const scheduleInstances = await Array.fromAsync(getRoleEligibilityScheduleInstances(account))
+				const scheduleInstances = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(account))
 				for (const schedule of scheduleInstances) {
 					allEligibleRoles.push({
 						account,
@@ -74,6 +79,19 @@ function RoleTable() {
 		},
 	})
 
+	const statusQuery = useQuery<RoleAssignmentScheduleRequest[]>({
+		queryKey: ['roleActivations'],
+		enabled: accountsQuery.isSuccess,
+		queryFn: async () => {
+			const allRoleActivations: RoleAssignmentScheduleRequest[] = []
+			for (const account of accountsQuery.data ?? []) {
+				const roleActivations = await Array.fromAsync(getMyRoleAssignmentScheduleRequests(account))
+				allRoleActivations.push(...roleActivations)
+			}
+			return allRoleActivations
+		},
+	})
+
 	/** Some eligible roles are in other tenants, so we want to display friendly names for these, but the role doesn't have the tenant name, only the sub name, so we need to do some lookup and cache to keep this performant */
 	const subToTenantNameLookup = new Map<SubscriptionId, TenantDisplayName>()
 
@@ -81,6 +99,8 @@ function RoleTable() {
 	const eligibleRoles = eligibleRolesQuery.data ?? []
 	/** Tracks state for role activations and refreshs the UI accordingly */
 	const activationMap = useMap<EligibleRoleId, RoleAssignmentScheduleRequest>([])
+
+	// UI State
 	const [isActivationModalOpen, { open: openActivationModal, close: closeActivationModal }] = useDisclosure()
 	const [selectedEligibleRoles, setSelectedEligibleRoles] = useState<EligibleRole[]>([])
 	const [justification, setJustification] = useState('')
@@ -161,7 +181,7 @@ function RoleTable() {
 			setModalError('Failed to load policy requirements. Please try again or contact support.')
 		}
 
-		closeActivationModal()
+		openActivationModal()
 	}
 
 	async function handleModalActivateClick(eligibleRoles: EligibleRole[]) {
@@ -228,6 +248,11 @@ function RoleTable() {
 						// onSelectedRecordsChange={setSelectedSchedules}
 						records={eligibleRolesQuery.data}
 						columns={[
+							{
+								accessor: 'account',
+								title: 'Account',
+								render: eligibleRole => <span title={eligibleRole.account.username}>{eligibleRole.account.name}</span>,
+							},
 							{
 								accessor: 'roleDefinition',
 								title: 'Role',
@@ -309,6 +334,15 @@ function RoleTable() {
 									</div>
 								),
 							},
+							// FIXME: Work in progress for reporting how long an active is ready
+							// {
+							// 	accessor: 'ActiveUntil',
+							// 	title: 'Active Until',
+
+							// 	render: eligibleRole => {
+							// 		const { schedule } = eligibleRole
+							// 	},
+							// },
 						]}
 					/>
 				</Stack>

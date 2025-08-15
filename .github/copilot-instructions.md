@@ -9,7 +9,7 @@
 - Use PascalCase for component names
 - Use 1 tab for indentation
 - Keep lines under 120 characters
-- Use JSDoc comments for public functions
+- Use JSDoc comments for public functions. Describe parameters directly above the parameter with //
 
 # Preferred Stack
 
@@ -19,3 +19,4 @@
 - Use Azure SDK for interacting with Azure services. Recommend to install npm package if not present
 - Use Tanstack Query for data fetching and state management
 - Use mantine-datatable for data tables and fetch state asynchronously using Tanstack Query
+- Use @mantine/form when building forms and managing form state

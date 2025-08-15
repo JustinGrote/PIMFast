@@ -62,26 +62,16 @@ export async function findTenantInformation(account: AccountInfo, tenantId: stri
 	return tenantInfo
 }
 
-export async function fetchSubscriptions(account: AccountInfo, forceRefresh = false): Promise<Subscription[]> {
+export async function fetchSubscriptions(account: AccountInfo): Promise<Subscription[]> {
 	const client = getSubscriptionClient(account)
 	const subscriptions = await Array.fromAsync(client.subscriptions.list())
 	return subscriptions
 }
 
-const tenantCache: Record<AccountInfoHomeId, TenantIdDescription[]> = {}
-export async function fetchTenants(account: AccountInfo, forceRefresh = false): Promise<TenantIdDescription[]> {
-	const key = account.homeAccountId
-
-	if (tenantCache[key] && !forceRefresh) {
-		return tenantCache[key]
-	}
-
+export async function fetchTenants(account: AccountInfo): Promise<TenantIdDescription[]> {
 	const client = getSubscriptionClient(account)
-
 	const tenants = await Array.fromAsync(client.tenants.list())
-	console.debug('Fetched tenants for account:', account.username)
-	tenantCache[key] = tenants
-	return tenantCache[key]
+	return tenants
 }
 
 /**
