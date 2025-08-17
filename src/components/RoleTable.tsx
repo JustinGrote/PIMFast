@@ -2,7 +2,7 @@ import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } fr
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
-import { ActionIcon, Button, Center, Group, Modal, Paper, Stack, Title } from '@mantine/core'
+import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Title } from '@mantine/core'
 import { useDisclosure, useMap } from '@mantine/hooks'
 import { IconClick, IconPlayerPlay, IconPlayerStop, IconQuestionMark, IconRefresh } from '@tabler/icons-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -14,7 +14,11 @@ import { DataTable } from 'mantine-datatable'
 import { useEffect, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
-import { deactivateEligibleRole, getEligibleRoleAssignment, getMyRoleEligibilityScheduleInstances } from '../common/pim'
+import {
+	deactivateEligibleRole,
+	getMyRoleAssignmentScheduleInstances,
+	getMyRoleEligibilityScheduleInstances,
+} from '../common/pim'
 import './RoleTable.css'
 
 dayjs.extend(durationPlugin)
@@ -63,18 +67,47 @@ function RoleTable() {
 		},
 	})
 
-	const roleStatusQuery = useQuery({
-		queryKey: ['eligibleRoleStatus'],
-		enabled: eligibleRolesQuery.isSuccess,
+	type HomeAccountInfoId = AccountInfo['homeAccountId']
+	type RoleAssignmentsByAccount = Record<HomeAccountInfoId, RoleAssignmentScheduleInstance[]>
+	const roleAssignmentsScheduleInstancesByAccountQuery = useQuery<RoleAssignmentsByAccount>({
+		queryKey: ['roleAssignmentScheduleInstances'],
+		enabled: accountsQuery.isSuccess,
 		queryFn: async () => {
-			const roleAssignments: Record<EligibleRoleId, RoleAssignmentScheduleInstance | undefined> = {}
+			const accounts = accountsQuery.data ?? []
 
-			const eligibleRoles = await Array.fromAsync(eligibleRolesQuery.data ?? [])
-			for (const eligibleRole of eligibleRoles) {
-				const roleAssignment = await getEligibleRoleAssignment(eligibleRole)
-				roleAssignments[eligibleRole.id] = roleAssignment
+			// Fetch schedule instances for all accounts in parallel
+			const accountSchedulePromises = accounts.map(async account => ({
+				account,
+				schedules: await Array.fromAsync(getMyRoleAssignmentScheduleInstances(account)),
+			}))
+
+			const accountScheduleResults = await Promise.all(accountSchedulePromises)
+
+			// Reconstruct the lookup object
+			const roleAssignmentsByAccount: RoleAssignmentsByAccount = {}
+			for (const result of accountScheduleResults) {
+				roleAssignmentsByAccount[result.account.homeAccountId] = result.schedules
 			}
-			return roleAssignments
+
+			return roleAssignmentsByAccount
+		},
+	})
+
+	type RoleToStatusLookup = Record<EligibleRoleId, RoleAssignmentScheduleInstance | undefined>
+	const roleStatusQuery = useQuery<RoleToStatusLookup>({
+		queryKey: ['eligibleRoleStatus'],
+		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsScheduleInstancesByAccountQuery.isSuccess,
+		queryFn: () => {
+			const roleToStatusLookup: RoleToStatusLookup = {}
+			const roleAssignmentAccountMap = roleAssignmentsScheduleInstancesByAccountQuery.data ?? {}
+			const eligibleRoles = eligibleRolesQuery.data ?? []
+
+			for (const role of eligibleRoles) {
+				roleToStatusLookup[role.id] = roleAssignmentAccountMap[role.account.homeAccountId]?.find(
+					assignment => assignment.linkedRoleEligibilityScheduleInstanceId === role.schedule.id,
+				)
+			}
+			return roleToStatusLookup
 		},
 	})
 
@@ -86,6 +119,15 @@ function RoleTable() {
 	function isEligibleRoleActivated(role: EligibleRole): boolean {
 		if (!roleStatusQuery.data) return false
 		return roleStatusQuery.data[role.id]?.status === KnownStatus.Provisioned
+	}
+
+	/** Azure PIM has a undocumented requirement that a role must be activated at least 5 minutes before it can be deactivated. We use this function to determine if that is the case, for purposes of disabling the stop button for instance */
+	function isEligibleRoleNewlyActivated(role: EligibleRole): boolean {
+		const AZURE_PIM_MIN_ACTIVATION_TIME = 5
+		if (!roleStatusQuery.data) return false
+		const startDateTime = roleStatusQuery.data[role.id]?.startDateTime
+		if (!startDateTime) return false
+		return dayjs().diff(dayjs(startDateTime), 'minutes') < AZURE_PIM_MIN_ACTIVATION_TIME
 	}
 
 	/** Some eligible roles are in other tenants, so we want to display friendly names for these, but the role doesn't have the tenant name, only the sub name, so we need to do some lookup and cache to keep this performant */
@@ -230,7 +272,11 @@ function RoleTable() {
 									const { schedule } = eligibleRole
 									if (!schedule.scope) return <span>Unknown</span>
 									const tenantName = tenantNameMap.get(eligibleRole.id) || 'Unknown'
-									return <span>{tenantName || 'Unknown'}</span>
+									return (
+										<Skeleton visible={!tenantName}>
+											<span>{tenantName}</span>
+										</Skeleton>
+									)
 								},
 							},
 							{
@@ -240,14 +286,13 @@ function RoleTable() {
 										<IconClick size={16} />
 									</Center>
 								),
-								width: '80',
 								render: (eligibleRole: EligibleRole) => (
 									<div className="one-line-row">
 										<Group>
 											<ActionIcon
 												size="sm"
 												variant="subtle"
-												color="green"
+												disabled={isEligibleRoleNewlyActivated(eligibleRole)}
 												onClick={() => {
 													handleActivateClick(eligibleRole)
 												}}
@@ -255,14 +300,24 @@ function RoleTable() {
 													color: 'blue',
 												}}
 											>
-												{isEligibleRoleActivated(eligibleRole) ? (
-													<IconPlayerStop
-														size={16}
-														color="red"
-													/>
-												) : (
-													<IconPlayerPlay size={16} />
-												)}
+												<Skeleton visible={!roleStatusQuery.isSuccess}>
+													{isEligibleRoleActivated(eligibleRole) ? (
+														<IconPlayerStop
+															size="sm"
+															color={isEligibleRoleNewlyActivated(eligibleRole) ? undefined : 'red'}
+															title={
+																isEligibleRoleNewlyActivated(eligibleRole)
+																	? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
+																	: 'Deactivate Role'
+															}
+														/>
+													) : (
+														<IconPlayerPlay
+															size="sm"
+															color="green"
+														/>
+													)}
+												</Skeleton>
 											</ActionIcon>
 										</Group>
 									</div>

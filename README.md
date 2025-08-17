@@ -12,6 +12,6 @@ PIMFast is an [Azure Public Client App](https://learn.microsoft.com/en-us/entra/
 
 PIMFast has a default application principal for convenience which you can opt in, and only has rights to perform actions that you yourself have rights defined for. It does not require any kind of "admin" level grant. Currently this is the only supported option but the ability to supply your own custom application registration is forthcoming.
 
-## Development
+## Development and Nonstandard Terminology
 
 This project defines a type known as `EligibleRole` which includes both the account and the eligible role schedule instance. This is because we support multiple accounts, and there is a possible many-to-one relationship between accounts and eligible roles, so we need both for context.
