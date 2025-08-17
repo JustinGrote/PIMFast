@@ -29,24 +29,6 @@ function getPimClient(account: AccountInfo) {
 	return client
 }
 
-export async function getMyRoleEligibilitySchedules(account: AccountInfo, scope: string = '') {
-	return getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: MY_ROLES_ONLY })
-}
-
-/** Represents roles that can currently be activated right now */
-export function getMyRoleEligibilityScheduleInstances(account: AccountInfo, scope: string = '') {
-	const iterator = getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
-	return iterator
-}
-
-export function getMyRoleAssignmentScheduleRequests(account: AccountInfo, scope: string = '') {
-	return getPimClient(account).roleAssignmentScheduleRequests.listForScope(scope, { filter: MY_ROLES_ONLY })
-}
-
-export function filterActivatedRoles(assignment: RoleAssignmentScheduleInstance[]) {
-	return assignment.filter(assignment => assignment.assignmentType === 'Activated')
-}
-
 export async function getRoleManagementPolicyAssignments(
 	account: AccountInfo,
 	schedule: RoleEligibilityScheduleInstance,
@@ -159,6 +141,23 @@ export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
 		}
 	}
 }
+
+export const getMyRoleEligibilitySchedules = (account: AccountInfo, scope: string = '') =>
+	getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: MY_ROLES_ONLY })
+
+/** Roles that can currently be activated right now */
+export const getMyRoleEligibilityScheduleInstances = (account: AccountInfo, scope: string = '') =>
+	getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
+
+/** Roles that are either eligible activated or assigned */
+export const getMyRoleAssignmentScheduleInstances = (account: AccountInfo, scope: string = '') =>
+	getPimClient(account).roleAssignmentScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
+
+export const getMyRoleAssignmentScheduleRequests = (account: AccountInfo, scope: string = '') =>
+	getPimClient(account).roleAssignmentScheduleRequests.listForScope(scope, { filter: MY_ROLES_ONLY })
+
+export const filterActivatedRoles = (assignment: RoleAssignmentScheduleInstance[]) =>
+	assignment.filter(assignment => assignment.assignmentType === 'Activated')
 
 // These types are useful for uniquely identifying these items without using their objects
 export type RoleAssignmentScheduleRequestId = NonNullable<RoleAssignmentScheduleRequest['id']>
