@@ -133,6 +133,18 @@ export async function activateEligibleRole(
 	return await getPimClient(account).roleAssignmentScheduleRequests.create(request.scope, request.id, request)
 }
 
+export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
+	const { account, schedule } = eligibleRole
+	const client = getPimClient(account)
+	if (!schedule.scope) throwError('scope doesnt exist')
+	if (!schedule.id) throwError('id doesnt exist')
+	return await client.roleAssignmentScheduleRequests.create(schedule.scope, crypto.randomUUID(), {
+		requestType: 'SelfDeactivate',
+		principalId: account.localAccountId,
+		roleDefinitionId: schedule.roleDefinitionId,
+	})
+}
+
 /** Check a role status by fetching its request and seeing if it links back to the schedule */
 export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
 	const { account, schedule } = eligibleRole

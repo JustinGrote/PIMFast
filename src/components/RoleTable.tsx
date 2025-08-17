@@ -5,7 +5,7 @@ import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Stack, Title } from '@mantine/core'
 import { useDisclosure, useMap } from '@mantine/hooks'
 import { IconClick, IconPlayerPlay, IconPlayerStop, IconQuestionMark, IconRefresh } from '@tabler/icons-react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
@@ -14,7 +14,7 @@ import { DataTable } from 'mantine-datatable'
 import { useEffect, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
-import { getEligibleRoleAssignment, getMyRoleEligibilityScheduleInstances } from '../common/pim'
+import { deactivateEligibleRole, getEligibleRoleAssignment, getMyRoleEligibilityScheduleInstances } from '../common/pim'
 import './RoleTable.css'
 
 dayjs.extend(durationPlugin)
@@ -67,16 +67,20 @@ function RoleTable() {
 		queryKey: ['eligibleRoleStatus'],
 		enabled: eligibleRolesQuery.isSuccess,
 		queryFn: async () => {
-			const query = await eligibleRolesQuery
 			const roleAssignments: Record<EligibleRoleId, RoleAssignmentScheduleInstance | undefined> = {}
 
-			const eligibleRoles = await Array.fromAsync(query.data ?? [])
+			const eligibleRoles = await Array.fromAsync(eligibleRolesQuery.data ?? [])
 			for (const eligibleRole of eligibleRoles) {
 				const roleAssignment = await getEligibleRoleAssignment(eligibleRole)
 				roleAssignments[eligibleRole.id] = roleAssignment
 			}
 			return roleAssignments
 		},
+	})
+
+	const deactivateEligibleRoleMutation = useMutation({
+		mutationKey: ['deactivateEligibleRole'],
+		mutationFn: deactivateEligibleRole,
 	})
 
 	function isEligibleRoleActivated(role: EligibleRole): boolean {
@@ -141,7 +145,11 @@ function RoleTable() {
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
 		setSelectedRole(eligibleRole)
-		openActivationModal()
+		if (!isEligibleRoleActivated(eligibleRole)) {
+			openActivationModal()
+		} else {
+			deactivateEligibleRoleMutation.mutate(eligibleRole)
+		}
 	}
 
 	return (
@@ -235,16 +243,14 @@ function RoleTable() {
 								width: '80',
 								render: (eligibleRole: EligibleRole) => (
 									<div className="one-line-row">
-										<Group
-											gap={4}
-											justify="right"
-											wrap="nowrap"
-										>
+										<Group>
 											<ActionIcon
 												size="sm"
 												variant="subtle"
 												color="green"
-												onClick={() => handleActivateClick(eligibleRole)}
+												onClick={() => {
+													handleActivateClick(eligibleRole)
+												}}
 												loaderProps={{
 													color: 'blue',
 												}}
