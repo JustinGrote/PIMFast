@@ -1,3 +1,4 @@
+import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/common/azureResourceId'
 import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
@@ -26,23 +27,6 @@ dayjs.extend(relativeTimePlugin)
 
 // FIXME: Handle if a tenant doesn't have P2 license
 
-/**
- * Generates the Azure portal URL for a given scope
- * @param scope The resource scope/ID
- * @param scopeType The type of scope (subscription, resourcegroup, managementgroup)
- */
-function getAzurePortalUrl(scope: string, scopeType?: string): string {
-	const baseUrl = 'https://portal.azure.com/#@/resource'
-
-	// For management groups, use a different URL pattern
-	if (scopeType === 'managementgroup') {
-		const mgId = scope.split('/').pop()
-		return `https://portal.azure.com/#view/Microsoft_Azure_ManagementGroups/ManagementGroupDrilldownMenuBlade/~/overview/mgId/${mgId}`
-	}
-
-	return `${baseUrl}${scope}`
-}
-
 /** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
 interface AccountRoleEligibilityScheduleInstance {
 	account: AccountInfo
@@ -63,6 +47,21 @@ function RoleTable() {
 	const accountsQuery = useQuery<AccountInfo[]>({
 		queryKey: ['accounts'],
 		queryFn: getAllAccounts,
+	})
+
+	const { data: currentTab, refetch } = useQuery<chrome.tabs.Tab | undefined>({
+		queryKey: ['currentTab'],
+		queryFn: async () => {
+			const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+			return tab
+		},
+	})
+
+	chrome.tabs.onUpdated.addListener((_tabId, _changeInfo, tab) => {
+		// We only care about updates to the active tab for this side panel.
+		if (tab.active && tab.windowId === currentTab?.windowId) {
+			refetch()
+		}
 	})
 
 	// TODO: Perform this in parallel
@@ -245,6 +244,20 @@ function RoleTable() {
 						fetching={eligibleRolesQuery.isFetching}
 						highlightOnHover
 						pinLastColumn
+						rowColor={({ schedule }) => {
+							if (!currentTab?.url) {
+								return undefined
+							}
+							try {
+								const resourceUri = getResourceIdFromPortalUrl(currentTab.url)
+								if (resourceUri.startsWith(schedule.scope!)) {
+									return 'green'
+								}
+							} catch (error: any) {
+								console.debug(`Failed to find resource ID in ${currentTab.url}: ${error.message}`)
+							}
+							return undefined
+						}}
 						// TODO: Add multiple activation support
 						// selectedRecords={selectedSchedules}
 						// onSelectedRecordsChange={setSelectedSchedules}
@@ -279,7 +292,10 @@ function RoleTable() {
 										: '#'
 
 									return (
-										<Group wrap="nowrap">
+										<Group
+											gap="xs"
+											wrap="nowrap"
+										>
 											{icon}
 											<a
 												href={portalUrl}

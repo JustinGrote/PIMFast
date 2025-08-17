@@ -1,5 +1,7 @@
 /** Parse an Azure Resource ID into its component parts. Supports management groups, tenants, resource groups, resources, and child resources. */
 
+import { throwIfNotError } from './util'
+
 /**
  * Base type for Azure Resource IDs
  */
@@ -14,19 +16,22 @@ export type TenantId = AzureResourceIdBase
 export type ManagementGroupId = AzureResourceIdBase
 export type SubscriptionId = AzureResourceIdBase
 
-export type ResourceGroupId = SubscriptionId & Readonly<{
-	subscription: string
-}>
+export type ResourceGroupId = SubscriptionId &
+	Readonly<{
+		subscription: string
+	}>
 
-export type ResourceId = ResourceGroupId & Readonly<{
-	provider: string
-	type: string
-	resourceGroup: string
-}>
+export type ResourceId = ResourceGroupId &
+	Readonly<{
+		provider: string
+		type: string
+		resourceGroup: string
+	}>
 
-export type ChildResourceId = ResourceId & Readonly<{
-	resource: string
-}>
+export type ChildResourceId = ResourceId &
+	Readonly<{
+		resource: string
+	}>
 
 export type AzureResourceId =
 	| TenantId
@@ -137,13 +142,53 @@ export function parseResourceId(resourceId: string): AzureResourceId {
  * @param scopeType The type of scope (subscription, resourcegroup, managementgroup)
  */
 export function getAzurePortalUrl(scope: string, scopeType?: string): string {
-	const baseUrl = 'https://portal.azure.com/#@/resource';
+	const baseUrl = 'https://portal.azure.com/#@/resource'
 
 	// For management groups, use a different URL pattern
 	if (scopeType === 'managementgroup') {
-		const mgId = scope.split('/').pop();
-		return `https://portal.azure.com/#view/Microsoft_Azure_ManagementGroups/ManagementGroupDrilldownMenuBlade/~/overview/mgId/${mgId}`;
+		const mgId = scope.split('/').pop()
+		return `https://portal.azure.com/#view/Microsoft_Azure_ManagementGroups/ManagementGroupDrilldownMenuBlade/~/overview/mgId/${mgId}`
 	}
 
-	return `${baseUrl}${scope}`;
+	return `${baseUrl}${scope}`
+}
+
+/**
+ * Parses an Azure portal URL and extracts the resource ID
+ * @param portalUrl The Azure portal URL
+ * @returns The extracted resource ID
+ */
+export function getResourceIdFromPortalUrl(portalUrl: string): string {
+	try {
+		const url = new URL(portalUrl)
+		if (url.hostname !== 'portal.azure.com') throw new Error('Does not begin with portal.azure.com')
+		// NOTE: The regex below looks for a word after the resource ID like "overview" etc. because the portal usually has these here. This is probably fragile.
+		const resourceIdMatch = url.hash?.match(/#@(?<tenant>[^/]+)?\/resource(?<resourceId>\/.+)\/[^/]+?$/)
+
+		if (resourceIdMatch === null) {
+			throw 'Could not extract base resource ID from url'
+		}
+		const { resourceId: resourceIdBase } = resourceIdMatch.groups!
+		let resourceId: string | undefined
+
+		try {
+			parseResourceId(resourceIdBase)
+			resourceId = resourceIdBase // Validate the resource ID format
+		} catch {
+			// Try splitting on the last slash and parsing the first part
+			const parts = resourceIdBase.split('/')
+			if (parts.length > 1) {
+				parseResourceId(parts[0])
+				resourceId = parts[0]
+			}
+		}
+
+		if (!resourceId) {
+			throw new Error('Unable to extract resource ID from portal URL')
+		}
+		return resourceId
+	} catch (error) {
+		throwIfNotError(error)
+		throw new Error(`Invalid Azure portal URL ${portalUrl}: ${error.message}`)
+	}
 }

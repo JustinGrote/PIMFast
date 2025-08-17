@@ -16,6 +16,7 @@ export default defineManifest({
 		default_popup: 'src/popup/index.html',
 	},
 	permissions: ['sidePanel', 'contentSettings', 'identity', 'storage'],
+	host_permissions: ['https://portal.azure.com/*'],
 	content_scripts: [
 		{
 			js: ['src/content/main.tsx'],
