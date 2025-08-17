@@ -140,7 +140,8 @@ await client.initialize()
 export const hasAuthenticatedAccounts = () => client.getAllAccounts().length > 0
 
 export async function logout(account: AccountInfo) {
-	await client.logoutRedirect({
+	// TODO: Use the logout URI functionality so a logout is recorded in Azure. This is tricky in an extension though.
+	await client.clearCache({
 		account: account,
 	})
 }
