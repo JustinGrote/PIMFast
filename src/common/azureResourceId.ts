@@ -130,3 +130,20 @@ export function parseResourceId(resourceId: string): AzureResourceId {
 		`${resourceId} is not a valid Azure Resource ID. Supported formats: tenant, management group, subscription, resource group, resource, child resource.`,
 	)
 }
+
+/**
+ * Generates the Azure portal URL for a given scope
+ * @param scope The resource scope/ID
+ * @param scopeType The type of scope (subscription, resourcegroup, managementgroup)
+ */
+export function getAzurePortalUrl(scope: string, scopeType?: string): string {
+	const baseUrl = 'https://portal.azure.com/#@/resource';
+
+	// For management groups, use a different URL pattern
+	if (scopeType === 'managementgroup') {
+		const mgId = scope.split('/').pop();
+		return `https://portal.azure.com/#view/Microsoft_Azure_ManagementGroups/ManagementGroupDrilldownMenuBlade/~/overview/mgId/${mgId}`;
+	}
+
+	return `${baseUrl}${scope}`;
+}

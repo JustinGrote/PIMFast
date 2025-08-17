@@ -26,6 +26,23 @@ dayjs.extend(relativeTimePlugin)
 
 // FIXME: Handle if a tenant doesn't have P2 license
 
+/**
+ * Generates the Azure portal URL for a given scope
+ * @param scope The resource scope/ID
+ * @param scopeType The type of scope (subscription, resourcegroup, managementgroup)
+ */
+function getAzurePortalUrl(scope: string, scopeType?: string): string {
+	const baseUrl = 'https://portal.azure.com/#@/resource'
+
+	// For management groups, use a different URL pattern
+	if (scopeType === 'managementgroup') {
+		const mgId = scope.split('/').pop()
+		return `https://portal.azure.com/#view/Microsoft_Azure_ManagementGroups/ManagementGroupDrilldownMenuBlade/~/overview/mgId/${mgId}`
+	}
+
+	return `${baseUrl}${scope}`
+}
+
 /** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
 interface AccountRoleEligibilityScheduleInstance {
 	account: AccountInfo
@@ -256,13 +273,23 @@ function RoleTable() {
 										.with('subscription', () => <Subscriptions />)
 										.with('managementgroup', () => <ManagementGroups />)
 										.otherwise(() => <IconQuestionMark />)
+									const displayName = schedule.expandedProperties?.scope?.displayName ?? 'unknown'
+									const portalUrl = schedule.scope
+										? getAzurePortalUrl(schedule.scope, schedule.expandedProperties?.scope?.type)
+										: '#'
 
 									return (
 										<Group wrap="nowrap">
 											{icon}
-											<span title={schedule.scope ?? ''}>
-												{schedule.expandedProperties?.scope?.displayName ?? 'unknown'}
-											</span>
+											<a
+												href={portalUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												title={schedule.scope ?? ''}
+												style={{ textDecoration: 'none', color: 'inherit' }}
+											>
+												{displayName}
+											</a>
 										</Group>
 									)
 								},
@@ -309,7 +336,7 @@ function RoleTable() {
 															color={isEligibleRoleNewlyActivated(eligibleRole) ? undefined : 'red'}
 															title={
 																isEligibleRoleNewlyActivated(eligibleRole)
-																	? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
+																	? `Role must be active for a minimu of at least 5 minutes before it can be disabled`
 																	: 'Deactivate Role'
 															}
 														/>
