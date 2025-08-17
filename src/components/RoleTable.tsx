@@ -1,10 +1,10 @@
 import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
+import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Stack, Title } from '@mantine/core'
 import { useDisclosure, useMap } from '@mantine/hooks'
-import { IconClick, IconPlayerPlay, IconQuestionMark, IconRefresh } from '@tabler/icons-react'
+import { IconClick, IconPlayerPlay, IconPlayerStop, IconQuestionMark, IconRefresh } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
@@ -14,7 +14,7 @@ import { DataTable } from 'mantine-datatable'
 import { useEffect, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
-import { getMyRoleEligibilityScheduleInstances } from '../common/pim'
+import { getEligibleRoleAssignment, getMyRoleEligibilityScheduleInstances } from '../common/pim'
 import './RoleTable.css'
 
 dayjs.extend(durationPlugin)
@@ -62,6 +62,27 @@ function RoleTable() {
 			return allEligibleRoles
 		},
 	})
+
+	const roleStatusQuery = useQuery({
+		queryKey: ['eligibleRoleStatus'],
+		enabled: eligibleRolesQuery.isSuccess,
+		queryFn: async () => {
+			const query = await eligibleRolesQuery
+			const roleAssignments: Record<EligibleRoleId, RoleAssignmentScheduleInstance | undefined> = {}
+
+			const eligibleRoles = await Array.fromAsync(query.data ?? [])
+			for (const eligibleRole of eligibleRoles) {
+				const roleAssignment = await getEligibleRoleAssignment(eligibleRole)
+				roleAssignments[eligibleRole.id] = roleAssignment
+			}
+			return roleAssignments
+		},
+	})
+
+	function isEligibleRoleActivated(role: EligibleRole): boolean {
+		if (!roleStatusQuery.data) return false
+		return roleStatusQuery.data[role.id]?.status === KnownStatus.Provisioned
+	}
 
 	/** Some eligible roles are in other tenants, so we want to display friendly names for these, but the role doesn't have the tenant name, only the sub name, so we need to do some lookup and cache to keep this performant */
 	const subToTenantNameLookup = new Map<SubscriptionId, TenantDisplayName>()
@@ -228,7 +249,14 @@ function RoleTable() {
 													color: 'blue',
 												}}
 											>
-												<IconPlayerPlay size={16} />
+												{isEligibleRoleActivated(eligibleRole) ? (
+													<IconPlayerStop
+														size={16}
+														color="red"
+													/>
+												) : (
+													<IconPlayerPlay size={16} />
+												)}
 											</ActionIcon>
 										</Group>
 									</div>

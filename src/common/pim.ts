@@ -1,3 +1,4 @@
+import { EligibleRole } from '@/components/RoleTable'
 import {
 	AuthorizationManagementClient,
 	RoleAssignmentScheduleInstance,
@@ -6,10 +7,12 @@ import {
 } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
+import { throwError } from './util'
 
 // Scoping to subscription is not needed for the client as we will do it in our requests
 const UNSPECIFIED_SUBSCRIPTION_ID = '00000000-0000-0000-0000-000000000000'
-
+/** This is needed for every query or higher privileges are required */
+const MY_ROLES_ONLY = 'asTarget()'
 const pimClients: Map<AccountInfoHomeId, AuthorizationManagementClient> = new Map()
 
 /**
@@ -27,58 +30,21 @@ function getPimClient(account: AccountInfo) {
 }
 
 export async function getMyRoleEligibilitySchedules(account: AccountInfo, scope: string = '') {
-	return getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: 'asTarget()' })
+	return getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: MY_ROLES_ONLY })
 }
 
 /** Represents roles that can currently be activated right now */
 export function getMyRoleEligibilityScheduleInstances(account: AccountInfo, scope: string = '') {
-	const iterator = getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: 'asTarget()' })
+	const iterator = getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
 	return iterator
 }
 
 export function getMyRoleAssignmentScheduleRequests(account: AccountInfo, scope: string = '') {
-	return getPimClient(account).roleAssignmentScheduleRequests.listForScope(scope, { filter: 'asTarget()' })
+	return getPimClient(account).roleAssignmentScheduleRequests.listForScope(scope, { filter: MY_ROLES_ONLY })
 }
 
 export function filterActivatedRoles(assignment: RoleAssignmentScheduleInstance[]) {
 	return assignment.filter(assignment => assignment.assignmentType === 'Activated')
-}
-
-export function getEligibleRoleStatus(
-	eligibleRole: RoleEligibilityScheduleInstance,
-	activations: RoleAssignmentScheduleInstance[] = [],
-	requests: RoleAssignmentScheduleRequest[] = [],
-) {
-	// First check if role is activated. This should be a 1:1 relationship to the schedule, PIM prevents multiple activations
-	const activeActivation = activations.find(a => a.linkedRoleEligibilityScheduleInstanceId === eligibleRole.id)
-	if (activeActivation)
-		return {
-			schedule: eligibleRole,
-			assignmentOrRequest: activeActivation,
-			status: activeActivation.status,
-		}
-
-	const sortedActivationRequests = requests
-		.filter(request => request.linkedRoleEligibilityScheduleId === eligibleRole.id)
-
-		// Sort by newest created
-		// TODO: Some more nuance probably needed here, like for failed requests
-		.sort(({ createdOn: a }, { createdOn: b }) => (b?.getTime() ?? 0) - (a?.getTime() ?? 0))
-
-	const mostRecentActivationRequest = sortedActivationRequests.length > 0 ? sortedActivationRequests[0] : undefined
-
-	if (mostRecentActivationRequest) {
-		return {
-			schedule: eligibleRole,
-			assignmentOrRequest: mostRecentActivationRequest,
-			status: mostRecentActivationRequest.status,
-		}
-	}
-	return {
-		schedule: eligibleRole,
-		assignmentOrRequest: undefined,
-		status: 'Idle',
-	}
 }
 
 export async function getRoleManagementPolicyAssignments(
@@ -165,6 +131,21 @@ export async function activateEligibleRole(
 	request: EligibleRoleActivationRequest,
 ): Promise<RoleAssignmentScheduleRequest> {
 	return await getPimClient(account).roleAssignmentScheduleRequests.create(request.scope, request.id, request)
+}
+
+/** Check a role status by fetching its request and seeing if it links back to the schedule */
+export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
+	const { account, schedule } = eligibleRole
+	const client = getPimClient(account)
+	const scopedAssignments = client.roleAssignmentScheduleInstances.listForScope(
+		schedule.scope ?? throwError('Missing schedule scope'),
+		{ filter: MY_ROLES_ONLY },
+	)
+	for await (const assignment of scopedAssignments) {
+		if (assignment.linkedRoleEligibilityScheduleInstanceId === schedule.id) {
+			return assignment
+		}
+	}
 }
 
 // These types are useful for uniquely identifying these items without using their objects
