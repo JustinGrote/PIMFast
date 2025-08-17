@@ -1,38 +1,40 @@
 import { getAllAccounts, logout } from '@/common/auth'
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Group, Text, Tooltip } from '@mantine/core'
+import { notifications } from '@mantine/notifications'
 import { IconX } from '@tabler/icons-react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { DataTable } from 'mantine-datatable'
-import { useEffect, useState } from 'react'
 
-interface AccountTableProps {
-	onNoAccounts?: () => void
-}
+export default function AccountTable() {
+	const {
+		data: accounts = [],
+		isLoading,
+		refetch,
+	} = useQuery({
+		queryKey: ['accounts'],
+		queryFn: getAllAccounts,
+	})
 
-export default function AccountTable({ onNoAccounts }: AccountTableProps) {
-	const [accounts, setAccounts] = useState<AccountInfo[]>([])
+	const { mutate: logoutAccount, isPending } = useMutation({
+		mutationKey: ['signOut'],
+		mutationFn: async (account: AccountInfo) => {
+			console.log(`Signing out account: ${account.username}`)
+			await logout(account)
+		},
+		onSuccess: () => {
+			refetch()
+		},
+		onError: error => {
+			notifications.show({
+				title: 'Sign Out Failed',
+				message: `Failed to sign out account: ${error}`,
+				color: 'red',
+			})
+		},
+	})
 
-	useEffect(() => {
-		async function fetchAccounts() {
-			const allAccounts = await getAllAccounts()
-			setAccounts(allAccounts)
-			if (allAccounts.length === 0 && onNoAccounts) {
-				onNoAccounts()
-			}
-		}
-		fetchAccounts()
-	}, [onNoAccounts])
-
-	async function handleSignOutAccount(account: AccountInfo) {
-		console.log(`Signing out account: ${account.username}`)
-		await logout(account)
-		// Optionally, refresh the accounts list after sign out
-		const allAccounts = await getAllAccounts()
-		setAccounts(allAccounts)
-		if (allAccounts.length === 0 && onNoAccounts) {
-			onNoAccounts()
-		}
-	}
+	const handleSignOutAccount = (account: AccountInfo) => logoutAccount(account)
 
 	return (
 		<DataTable
@@ -42,6 +44,8 @@ export default function AccountTable({ onNoAccounts }: AccountTableProps) {
 			striped
 			highlightOnHover
 			records={accounts}
+			fetching={isLoading}
+			id="homeAccountId"
 			columns={[
 				{
 					accessor: 'name',
@@ -69,6 +73,7 @@ export default function AccountTable({ onNoAccounts }: AccountTableProps) {
 								<ActionIcon
 									color="red"
 									variant="subtle"
+									loading={isPending}
 									onClick={() => handleSignOutAccount(account)}
 								>
 									<IconX size={16} />
