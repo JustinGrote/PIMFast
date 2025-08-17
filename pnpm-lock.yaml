@@ -23,6 +23,9 @@ importers:
       '@azure/msal-browser':
         specifier: ^3.30.0
         version: 3.30.0
+      '@formkit/auto-animate':
+        specifier: ^0.8.2
+        version: 0.8.2
       '@mantine/core':
         specifier: ^8.2.5
         version: 8.2.5(@mantine/hooks@8.2.5(react@19.1.1))(@types/react@19.1.10)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -516,6 +519,9 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@formkit/auto-animate@0.8.2':
+    resolution: {integrity: sha512-SwPWfeRa5veb1hOIBMdzI+73te5puUBHmqqaF1Bu7FjvxlYSz/kJcZKSa9Cg60zL0uRNeJL2SbRxV6Jp6Q1nFQ==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -2299,6 +2305,8 @@ snapshots:
       tabbable: 6.2.0
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@formkit/auto-animate@0.8.2': {}
 
   '@humanfs/core@0.19.1': {}
 

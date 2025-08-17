@@ -6,9 +6,9 @@ html,
 body {
 	margin: 0;
 	padding: 0;
-	width: 800px;
+	width: 780px;
 	height: 600px;
-	overflow: hidden;
+	overflow-x: hidden;
 }
 
 #root {

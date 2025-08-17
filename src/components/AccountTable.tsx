@@ -1,5 +1,6 @@
 import { getAllAccounts, logout } from '@/common/auth'
 import { AccountInfo } from '@azure/msal-browser'
+import { useAutoAnimate } from '@formkit/auto-animate/react'
 import { ActionIcon, Group, Text, Tooltip } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconX } from '@tabler/icons-react'
@@ -7,6 +8,8 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { DataTable } from 'mantine-datatable'
 
 export default function AccountTable() {
+	const [bodyRef] = useAutoAnimate<HTMLTableSectionElement>()
+
 	const {
 		data: accounts = [],
 		isLoading,
@@ -43,8 +46,10 @@ export default function AccountTable() {
 			withColumnBorders
 			striped
 			highlightOnHover
+			pinLastColumn
 			records={accounts}
 			fetching={isLoading}
+			bodyRef={bodyRef}
 			id="homeAccountId"
 			columns={[
 				{

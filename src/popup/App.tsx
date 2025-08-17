@@ -1,13 +1,15 @@
 import AccountTable from '@/components/AccountTable'
 import { Alert, Button, Card, Container, Group, Loader, Stack, Text, Title } from '@mantine/core'
 import { IconAlertCircle, IconBrandAzure } from '@tabler/icons-react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { hasAuthenticatedAccounts, login } from '../common/auth'
+
 import './App.css'
 
 export default function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(hasAuthenticatedAccounts)
+	const queryClient = useQueryClient()
 
 	const {
 		error: authError,
@@ -17,6 +19,8 @@ export default function App() {
 		mutationFn: login,
 		onSuccess: () => {
 			setIsAuthenticated(hasAuthenticatedAccounts)
+			// This is used in the AccountTable which will trigger an update
+			queryClient.invalidateQueries({ queryKey: ['accounts'] })
 		},
 	})
 

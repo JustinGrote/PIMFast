@@ -1,12 +1,3 @@
-/*
-We can remove most of the CSS as Mantine will handle the styling
-but we'll keep some basic settings for the popup
-*/
-
-body {
-	height: 600px;
-	width: 800px;
-	padding: 0;
-	margin: 0;
-	overflow-y: auto;
+.mantine-Table-td {
+	white-space: nowrap;
 }

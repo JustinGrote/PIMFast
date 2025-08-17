@@ -24,6 +24,8 @@ import './RoleTable.css'
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
 
+// FIXME: Handle if a tenant doesn't have P2 license
+
 /** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
 interface AccountRoleEligibilityScheduleInstance {
 	account: AccountInfo
