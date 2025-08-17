@@ -163,7 +163,7 @@ function RoleTable() {
 
 			if (tenantNameMap.has(role.id)) continue
 
-			if (!schedule.scope) throw 'Schedule Doesnt have a scope. This is a bug and should not happen'
+			if (!schedule.scope) throw new Error('Schedule Doesnt have a scope. This is a bug and should not happen')
 			const subscriptionId = parseSubscriptionIdFromResourceId(schedule.scope)
 			if (!subscriptionId) throw new Error('Failed to parse subscription ID from schedule scope')
 
