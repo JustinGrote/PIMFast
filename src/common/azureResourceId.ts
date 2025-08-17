@@ -166,7 +166,7 @@ export function getResourceIdFromPortalUrl(portalUrl: string): string {
 		const resourceIdMatch = url.hash?.match(/#@(?<tenant>[^/]+)?\/resource(?<resourceId>\/.+)\/[^/]+?$/)
 
 		if (resourceIdMatch === null) {
-			throw 'Could not extract base resource ID from url'
+			throw new Error('Could not extract base resource ID from url')
 		}
 		const { resourceId: resourceIdBase } = resourceIdMatch.groups!
 		let resourceId: string | undefined

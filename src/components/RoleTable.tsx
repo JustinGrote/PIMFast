@@ -1,5 +1,6 @@
 import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/common/azureResourceId'
 import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
+import { throwIfNotError } from '@/common/util'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
@@ -253,7 +254,8 @@ function RoleTable() {
 								if (resourceUri.startsWith(schedule.scope!)) {
 									return 'green'
 								}
-							} catch (error: any) {
+							} catch (error: unknown) {
+								throwIfNotError(error)
 								console.debug(`Failed to find resource ID in ${currentTab.url}: ${error.message}`)
 							}
 							return undefined

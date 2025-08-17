@@ -8,7 +8,7 @@ export function throwIfNotType<T>(value: unknown, type: string): asserts value i
 	}
 }
 export function throwIfNotError(value: unknown): asserts value is Error {
-	if (!(value instanceof Error)) {
+	if (value && !(value instanceof Error)) {
 		throw value
 	}
 }
