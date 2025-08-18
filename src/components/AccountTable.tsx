@@ -48,9 +48,9 @@ export default function AccountTable() {
 			highlightOnHover
 			pinLastColumn
 			records={accounts}
+			idAccessor="homeAccountId"
 			fetching={isLoading}
 			bodyRef={bodyRef}
-			id="homeAccountId"
 			columns={[
 				{
 					accessor: 'name',
