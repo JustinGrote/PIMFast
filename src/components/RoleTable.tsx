@@ -4,16 +4,16 @@ import { throwIfNotError } from '@/common/util'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
-import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Title } from '@mantine/core'
+import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure, useMap } from '@mantine/hooks'
-import { IconClick, IconPlayerPlay, IconPlayerStop, IconQuestionMark, IconRefresh } from '@tabler/icons-react'
+import { IconClick, IconPlayerPlay, IconPlayerStop, IconQuestionMark, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { DataTable } from 'mantine-datatable'
-import { useEffect, useState } from 'react'
+import { DataTable, DataTableSortStatus } from 'mantine-datatable'
+import { useEffect, useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
 import {
@@ -44,6 +44,11 @@ type TenantDisplayName = string
 function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
 	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
+	const [sortStatus, setSortStatus] = useState<DataTableSortStatus<EligibleRole>>({
+		columnAccessor: 'account',
+		direction: 'asc',
+	})
+	const [query, setQuery] = useState('')
 
 	const accountsQuery = useQuery<AccountInfo[]>({
 		queryKey: ['accounts'],
@@ -213,6 +218,61 @@ function RoleTable() {
 		}
 	}
 
+	// Filter and sort the eligible roles
+	const filteredAndSortedRoles = useMemo(() => {
+		let filtered = eligibleRoles
+
+		// Apply search filter
+		if (query) {
+			const lowerQuery = query.toLowerCase()
+			filtered = filtered.filter(role => {
+				const accountName = role.account.name?.toLowerCase() || ''
+				const roleName = role.schedule.expandedProperties?.roleDefinition?.displayName?.toLowerCase() || ''
+				const scopeName = role.schedule.expandedProperties?.scope?.displayName?.toLowerCase() || ''
+				const tenantName = tenantNameMap.get(role.id)?.toLowerCase() || ''
+
+				return accountName.includes(lowerQuery) || 
+					   roleName.includes(lowerQuery) || 
+					   scopeName.includes(lowerQuery) || 
+					   tenantName.includes(lowerQuery)
+			})
+		}
+
+		// Apply sorting
+		if (sortStatus.columnAccessor && sortStatus.direction) {
+			filtered.sort((a, b) => {
+				let aValue: string = ''
+				let bValue: string = ''
+
+				switch (sortStatus.columnAccessor) {
+					case 'account':
+						aValue = a.account.name || ''
+						bValue = b.account.name || ''
+						break
+					case 'roleDefinition':
+						aValue = a.schedule.expandedProperties?.roleDefinition?.displayName || ''
+						bValue = b.schedule.expandedProperties?.roleDefinition?.displayName || ''
+						break
+					case 'scope':
+						aValue = a.schedule.expandedProperties?.scope?.displayName || ''
+						bValue = b.schedule.expandedProperties?.scope?.displayName || ''
+						break
+					case 'tenant':
+						aValue = tenantNameMap.get(a.id) || ''
+						bValue = tenantNameMap.get(b.id) || ''
+						break
+					default:
+						return 0
+				}
+
+				const comparison = aValue.localeCompare(bValue)
+				return sortStatus.direction === 'desc' ? -comparison : comparison
+			})
+		}
+
+		return filtered
+	}, [eligibleRoles, query, sortStatus, tenantNameMap])
+
 	return (
 		<>
 			<Paper
@@ -236,6 +296,14 @@ function RoleTable() {
 						</Button>
 					</Group>
 
+					<TextInput
+						placeholder="Search roles, accounts, scopes, or tenants..."
+						leftSection={<IconSearch size={16} />}
+						value={query}
+						onChange={(event) => setQuery(event.currentTarget.value)}
+						mb="md"
+					/>
+
 					<DataTable
 						className="roleTable"
 						withTableBorder
@@ -245,6 +313,8 @@ function RoleTable() {
 						fetching={eligibleRolesQuery.isFetching}
 						highlightOnHover
 						pinLastColumn
+						sortStatus={sortStatus}
+						onSortStatusChange={setSortStatus}
 						rowColor={({ schedule }) => {
 							if (!currentTab?.url) {
 								return undefined
@@ -263,16 +333,18 @@ function RoleTable() {
 						// TODO: Add multiple activation support
 						// selectedRecords={selectedSchedules}
 						// onSelectedRecordsChange={setSelectedSchedules}
-						records={eligibleRolesQuery.data}
+						records={filteredAndSortedRoles}
 						columns={[
 							{
 								accessor: 'account',
 								title: 'Account',
+								sortable: true,
 								render: eligibleRole => <span title={eligibleRole.account.username}>{eligibleRole.account.name}</span>,
 							},
 							{
 								accessor: 'roleDefinition',
 								title: 'Role',
+								sortable: true,
 								render: eligibleRole => (
 									<span title={eligibleRole.schedule.roleDefinitionId || ''}>
 										{eligibleRole.schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
@@ -282,6 +354,7 @@ function RoleTable() {
 							{
 								accessor: 'scope',
 								title: 'Scope',
+								sortable: true,
 								render: ({ schedule }) => {
 									const icon = match(schedule.expandedProperties?.scope?.type)
 										.with('resourcegroup', () => <ResourceGroups />)
@@ -315,6 +388,7 @@ function RoleTable() {
 							{
 								accessor: 'tenant',
 								title: 'Tenant',
+								sortable: true,
 								render: eligibleRole => {
 									const { schedule } = eligibleRole
 									if (!schedule.scope) return <span>Unknown</span>
