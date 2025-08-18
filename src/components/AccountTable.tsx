@@ -15,7 +15,7 @@ export default function AccountTable() {
 		isLoading,
 		refetch,
 	} = useQuery({
-		queryKey: ['accounts'],
+		queryKey: ['pim', 'accounts'],
 		queryFn: getAllAccounts,
 	})
 

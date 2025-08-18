@@ -14,7 +14,7 @@ import {
 	IconRefresh,
 	IconSearch,
 } from '@tabler/icons-react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
@@ -55,10 +55,11 @@ function RoleTable() {
 		columnAccessor: 'account',
 		direction: 'asc',
 	})
+	const queryClient = useQueryClient()
 	const [query, setQuery] = useState('')
 
 	const accountsQuery = useQuery<AccountInfo[]>({
-		queryKey: ['accounts'],
+		queryKey: ['pim', 'accounts'],
 		queryFn: getAllAccounts,
 	})
 
@@ -79,7 +80,7 @@ function RoleTable() {
 
 	// TODO: Perform this in parallel
 	const eligibleRolesQuery = useQuery<EligibleRole[]>({
-		queryKey: ['eligibleRoles'],
+		queryKey: ['pim', 'eligibleRoles'],
 		enabled: accountsQuery.isSuccess,
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
@@ -101,7 +102,7 @@ function RoleTable() {
 	type HomeAccountInfoId = AccountInfo['homeAccountId']
 	type RoleAssignmentsByAccount = Record<HomeAccountInfoId, RoleAssignmentScheduleInstance[]>
 	const roleAssignmentsScheduleInstancesByAccountQuery = useQuery<RoleAssignmentsByAccount>({
-		queryKey: ['roleAssignmentScheduleInstances'],
+		queryKey: ['pim', 'roleAssignmentScheduleInstances'],
 		enabled: accountsQuery.isSuccess,
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
@@ -126,7 +127,12 @@ function RoleTable() {
 
 	type RoleToStatusLookup = Record<EligibleRoleId, RoleAssignmentScheduleInstance | undefined>
 	const roleStatusQuery = useQuery<RoleToStatusLookup>({
-		queryKey: ['eligibleRoleStatus'],
+		queryKey: [
+			'pim',
+			'eligibleRoleStatus',
+			eligibleRolesQuery.data,
+			roleAssignmentsScheduleInstancesByAccountQuery.data,
+		],
 		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsScheduleInstancesByAccountQuery.isSuccess,
 		queryFn: () => {
 			const roleToStatusLookup: RoleToStatusLookup = {}
@@ -141,6 +147,10 @@ function RoleTable() {
 			return roleToStatusLookup
 		},
 	})
+
+	async function refresh() {
+		await queryClient.invalidateQueries({ queryKey: ['pim'] })
+	}
 
 	const deactivateEligibleRoleMutation = useMutation({
 		mutationKey: ['deactivateEligibleRole'],
@@ -296,10 +306,12 @@ function RoleTable() {
 					>
 						<Title order={2}>Eligible Roles</Title>
 						<Button
-							disabled={true}
+							disabled={eligibleRolesQuery.isFetching}
 							variant="subtle"
+							color="green"
 							size="compact-xs"
 							styles={{ root: { height: '1.5rem', minHeight: 'unset', padding: '0 0.3rem' } }}
+							onClick={refresh}
 						>
 							<IconRefresh size="0.9rem" />
 						</Button>
