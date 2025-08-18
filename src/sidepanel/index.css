@@ -2,3 +2,14 @@
 	padding-top: 0 !important;
 	padding-bottom: 0 !important;
 }
+
+.tsqd-queries-overflow-container {
+	overflow-x: hidden;
+	white-space: nowrap;
+	max-width: 70vw;
+}
+
+div.tsqd-query-details-summary > pre > code {
+	height: 6em;
+	overflow: hidden;
+}

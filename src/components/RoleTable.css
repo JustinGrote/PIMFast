@@ -1,3 +1,10 @@
 .roleTable .mantine-Table-td {
 	white-space: nowrap;
 }
+
+
+.tsqd-queries-overflow-container {
+	overflow-x: hidden;
+	/* white-space: nowrap; */
+	max-width: 70vw;
+}

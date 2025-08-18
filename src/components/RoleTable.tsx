@@ -1,5 +1,6 @@
 import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/common/azureResourceId'
 import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
+import { getMilliseconds } from '@/common/time'
 import { throwIfNotError } from '@/common/util'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
@@ -36,14 +37,13 @@ dayjs.extend(relativeTimePlugin)
 // FIXME: Handle if a tenant doesn't have P2 license
 
 /** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
-interface AccountRoleEligibilityScheduleInstance {
+export interface EligibleRole {
 	account: AccountInfo
 	schedule: RoleEligibilityScheduleInstance
 	/** Set to a hyphenated string of account HomeAccountId and schedule Id. Has to be unique for row processing */
 	id: string
 }
-/** All the information required to activate a PIM eligible role */
-export type EligibleRole = AccountRoleEligibilityScheduleInstance
+
 type EligibleRoleId = EligibleRole['id']
 type SubscriptionId = string
 type TenantDisplayName = string
@@ -56,7 +56,7 @@ function RoleTable() {
 		direction: 'asc',
 	})
 	const queryClient = useQueryClient()
-	const [query, setQuery] = useState('')
+	const [filterQuery, setFilterQuery] = useState('')
 
 	const accountsQuery = useQuery<AccountInfo[]>({
 		queryKey: ['pim', 'accounts'],
@@ -80,8 +80,9 @@ function RoleTable() {
 
 	// TODO: Perform this in parallel
 	const eligibleRolesQuery = useQuery<EligibleRole[]>({
-		queryKey: ['pim', 'eligibleRoles'],
+		queryKey: ['pim', 'eligibleRoles', accountsQuery.data],
 		enabled: accountsQuery.isSuccess,
+		refetchInterval: getMilliseconds(10, 'seconds'),
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
 			const allEligibleRoles: EligibleRole[] = []
@@ -102,8 +103,9 @@ function RoleTable() {
 	type HomeAccountInfoId = AccountInfo['homeAccountId']
 	type RoleAssignmentsByAccount = Record<HomeAccountInfoId, RoleAssignmentScheduleInstance[]>
 	const roleAssignmentsScheduleInstancesByAccountQuery = useQuery<RoleAssignmentsByAccount>({
-		queryKey: ['pim', 'roleAssignmentScheduleInstances'],
+		queryKey: ['pim', 'roleAssignmentScheduleInstances', accountsQuery.data],
 		enabled: accountsQuery.isSuccess,
+		refetchInterval: getMilliseconds(10, 'seconds'),
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
 
@@ -237,11 +239,11 @@ function RoleTable() {
 
 	// Filter and sort the eligible roles
 	const filteredAndSortedRoles = useMemo(() => {
-		let filtered = eligibleRoles
+		let filtered: EligibleRole[] = eligibleRoles
 
 		// Apply search filter
-		if (query) {
-			const lowerQuery = query.toLowerCase()
+		if (filterQuery) {
+			const lowerQuery = filterQuery.toLowerCase()
 			filtered = filtered.filter(role => {
 				const accountName = role.account.name?.toLowerCase() || ''
 				const roleName = role.schedule.expandedProperties?.roleDefinition?.displayName?.toLowerCase() || ''
@@ -258,7 +260,7 @@ function RoleTable() {
 		}
 
 		// Apply sorting
-		if (sortStatus.columnAccessor && sortStatus.direction) {
+		if (sortStatus.columnAccessor) {
 			filtered.sort((a, b) => {
 				let aValue: string = ''
 				let bValue: string = ''
@@ -290,7 +292,7 @@ function RoleTable() {
 		}
 
 		return filtered
-	}, [eligibleRoles, query, sortStatus, tenantNameMap])
+	}, [filterQuery, sortStatus, eligibleRoles, tenantNameMap])
 
 	return (
 		<>
@@ -320,12 +322,12 @@ function RoleTable() {
 					<TextInput
 						placeholder="Search roles, accounts, scopes, or tenants..."
 						leftSection={<IconSearch size={16} />}
-						value={query}
-						onChange={event => setQuery(event.currentTarget.value)}
+						value={filterQuery}
+						onChange={event => setFilterQuery(event.currentTarget.value)}
 						mb="md"
 					/>
 
-					<DataTable
+					<DataTable<EligibleRole>
 						className="roleTable"
 						withTableBorder
 						borderRadius="xs"
@@ -428,7 +430,7 @@ function RoleTable() {
 										<IconClick size={16} />
 									</Center>
 								),
-								render: (eligibleRole: EligibleRole) => (
+								render: eligibleRole => (
 									<div className="one-line-row">
 										<Group>
 											<ActionIcon
@@ -449,7 +451,7 @@ function RoleTable() {
 															color={isEligibleRoleNewlyActivated(eligibleRole) ? undefined : 'red'}
 															title={
 																isEligibleRoleNewlyActivated(eligibleRole)
-																	? `Role must be active for a minimu of at least 5 minutes before it can be disabled`
+																	? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
 																	: 'Deactivate Role'
 															}
 														/>

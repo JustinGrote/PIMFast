@@ -20,7 +20,7 @@ export default function App() {
 		onSuccess: () => {
 			setIsAuthenticated(hasAuthenticatedAccounts)
 			// This is used in the AccountTable which will trigger an update
-			queryClient.invalidateQueries({ queryKey: ['accounts'] })
+			queryClient.refetchQueries({ queryKey: ['pim', 'accounts'] })
 		},
 	})
 
