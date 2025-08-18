@@ -6,7 +6,14 @@ import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleIns
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure, useMap } from '@mantine/hooks'
-import { IconClick, IconPlayerPlay, IconPlayerStop, IconQuestionMark, IconRefresh, IconSearch } from '@tabler/icons-react'
+import {
+	IconClick,
+	IconPlayerPlay,
+	IconPlayerStop,
+	IconQuestionMark,
+	IconRefresh,
+	IconSearch,
+} from '@tabler/icons-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
@@ -231,10 +238,12 @@ function RoleTable() {
 				const scopeName = role.schedule.expandedProperties?.scope?.displayName?.toLowerCase() || ''
 				const tenantName = tenantNameMap.get(role.id)?.toLowerCase() || ''
 
-				return accountName.includes(lowerQuery) || 
-					   roleName.includes(lowerQuery) || 
-					   scopeName.includes(lowerQuery) || 
-					   tenantName.includes(lowerQuery)
+				return (
+					accountName.includes(lowerQuery) ||
+					roleName.includes(lowerQuery) ||
+					scopeName.includes(lowerQuery) ||
+					tenantName.includes(lowerQuery)
+				)
 			})
 		}
 
@@ -300,7 +309,7 @@ function RoleTable() {
 						placeholder="Search roles, accounts, scopes, or tenants..."
 						leftSection={<IconSearch size={16} />}
 						value={query}
-						onChange={(event) => setQuery(event.currentTarget.value)}
+						onChange={event => setQuery(event.currentTarget.value)}
 						mb="md"
 					/>
 
