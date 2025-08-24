@@ -2,19 +2,13 @@ import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/common/azureRes
 import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
 import { getMilliseconds } from '@/common/time'
 import { throwIfNotError } from '@/common/util'
+import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure, useMap } from '@mantine/hooks'
-import {
-	IconClick,
-	IconPlayerPlay,
-	IconPlayerStop,
-	IconQuestionMark,
-	IconRefresh,
-	IconSearch,
-} from '@tabler/icons-react'
+import { IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
@@ -83,6 +77,7 @@ function RoleTable() {
 		queryKey: ['pim', 'eligibleRoles', accountsQuery.data],
 		enabled: accountsQuery.isSuccess,
 		refetchInterval: getMilliseconds(10, 'seconds'),
+		throwOnError: true,
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
 			const allEligibleRoles: EligibleRole[] = []
@@ -383,7 +378,7 @@ function RoleTable() {
 										.with('resourcegroup', () => <ResourceGroups />)
 										.with('subscription', () => <Subscriptions />)
 										.with('managementgroup', () => <ManagementGroups />)
-										.otherwise(() => <IconQuestionMark />)
+										.otherwise(() => <AzureResource />)
 									const displayName = schedule.expandedProperties?.scope?.displayName ?? 'unknown'
 									const portalUrl = schedule.scope
 										? getAzurePortalUrl(schedule.scope, schedule.expandedProperties?.scope?.type)
