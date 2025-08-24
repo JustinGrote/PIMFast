@@ -6,6 +6,8 @@ export default defineManifest({
 	name: pkg.title,
 	description: pkg.title,
 	version: pkg.version,
+	permissions: ['sidePanel', 'contentSettings', 'identity', 'storage', 'offscreen'],
+	host_permissions: ['https://portal.azure.com/*', 'ws://localhost/*'],
 	icons: {
 		48: 'public/logo.png',
 	},
@@ -15,15 +17,13 @@ export default defineManifest({
 		},
 		default_popup: 'src/popup/index.html',
 	},
-	permissions: ['sidePanel', 'contentSettings', 'identity', 'storage'],
-	host_permissions: ['https://portal.azure.com/*'],
+	side_panel: {
+		default_path: 'src/sidepanel/index.html',
+	},
 	content_scripts: [
 		{
 			js: ['src/content/main.tsx'],
 			matches: ['https://*/*'],
 		},
 	],
-	side_panel: {
-		default_path: 'src/sidepanel/index.html',
-	},
 })
