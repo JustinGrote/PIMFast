@@ -1,0 +1,11 @@
+{
+    // "typescript.experimental.useTsgo": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.addMissingImports.ts": "always",
+        "source.organizeImports": "always",
+        "source.fixAll": "always",
+        "source.removeUnusedImports": "always",
+        "source.sortImports": "always",
+    },
+}
