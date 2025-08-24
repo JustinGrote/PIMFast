@@ -1,0 +1,42 @@
+import { SVGAttributes } from 'react'
+
+interface AzureIconProps extends SVGAttributes<SVGElement> {
+	size?: string
+}
+
+export const AzureResource = ({ size, ...props }: AzureIconProps) => (
+	<svg
+		fill="currentColor"
+		width={size || '18'}
+		height={size || '18'}
+		viewBox="0 0 18 18"
+		role="presentation"
+		focusable="false"
+		xmlns="http://www.w3.org/2000/svg"
+		{...props}
+	>
+		<title>Azure Resource</title>
+		<path
+			fill="#32bedd"
+			d="M16.18 4.79v8.46L8.87 17.5V9.03l7.31-4.24z"
+		/>
+		<path
+			fill="#9cebff"
+			d="M16.18 4.79 8.87 9.04 1.55 4.78 8.87.53l7.31 4.26z"
+		/>
+		<path
+			fill="#50e6ff"
+			d="M8.87 9.04v8.46l-7.32-4.25V4.78l7.32 4.26z"
+		/>
+		<path
+			fill="#9cebff"
+			d="m1.55 13.25 7.32-4.22v8.47l-7.32-4.25z"
+		/>
+		<path
+			fill="#50e6ff"
+			d="M16.18 13.25 8.87 9.03v8.47l7.31-4.25z"
+		/>
+	</svg>
+)
+
+AzureResource.displayName = 'AzureResource'
