@@ -3,10 +3,25 @@ import {
 	AccountInfo,
 	AuthenticationResult,
 	BrowserAuthOptions,
+	INavigationClient,
+	INetworkModule,
 	LogLevel,
+	NavigationClient,
+	NetworkRequestOptions,
+	NetworkResponse,
 	PublicClientApplication,
 } from '@azure/msal-browser'
+import { FetchClient } from '../../node_modules/@azure/msal-browser/dist/network/FetchClient'
 import { throwError, throwIfNotError } from './util'
+
+/**
+ * This module provides authentication functionality using MSAL.js for a Chrome extension.
+ * It includes login, logout, and token acquisition methods.
+ *
+ * @module auth
+ */
+
+export type AccountInfoUniqueId = AccountInfo['localAccountId']
 
 export type AccountInfoHomeId = AccountInfo['homeAccountId']
 
@@ -16,6 +31,11 @@ export const scopesGraphAndAzure = [
 	'User.Read',
 	'CrossTenantInformation.ReadBasic.All',
 ]
+
+const PIMFAST_EXTENSION_ID = 'onokobaobjenkhjaopaglhmiegkchflp'
+
+const extensionRedirectUri =
+	chrome?.identity?.getRedirectURL('.auth') ?? `https://${PIMFAST_EXTENSION_ID}.chromiumapp.org/.auth`
 
 // HACK: We can only have one login at a time so we can have a promise here that we resolve when the login is complete to make the login function below return properly when awaited
 let loginPromise: Promise<AuthenticationResult | null> | null = null
@@ -53,6 +73,28 @@ export async function login() {
 		})
 	}
 
+	// The ID of the extension we want to talk to.
+	const MICROSOFT_SSO_EXTENSION_ID = 'ppnbnpeolgkicgegkbkbjmhlideopiji'
+
+	// Check if extension is installed
+	if (chrome?.runtime?.sendMessage) {
+		// Make a request:
+		console.log('Try WAM Handshake')
+		try {
+			const response = await chrome.runtime.sendMessage(MICROSOFT_SSO_EXTENSION_ID, {
+				action: 'handshake',
+				scopes: scopesGraphAndAzure,
+			})
+			if (!response.success) {
+				throw new Error('WAM Messaging Error', response)
+			}
+			console.log('WAM Messaging Response', response)
+		} catch (err) {
+			throwIfNotError(err)
+			console.error('WAM Messaging Error', err)
+		}
+	}
+
 	try {
 		// This should clear any outstanding requests. If msal.interaction.status is in session storage, it will be cleared using this function. If it is not cleared, the below will fail
 		await client.handleRedirectPromise()
@@ -62,6 +104,7 @@ export async function login() {
 			.acquireTokenRedirect({
 				scopes: scopesGraphAndAzure,
 				prompt: 'select_account',
+				redirectUri: extensionRedirectUri,
 			})
 			.catch(err => {
 				throw err
@@ -77,7 +120,7 @@ export async function login() {
 
 const msalChromeExtensionAuthOptions: BrowserAuthOptions = {
 	clientId: '980df394-42ba-4a2c-919c-3e7609f3dbd1',
-	redirectUri: chrome.identity.getRedirectURL('.auth'),
+	redirectUri: extensionRedirectUri,
 	onRedirectNavigate(url) {
 		launchChromeWebAuthFlow(url)
 			.then(async responseHash => {
@@ -119,19 +162,55 @@ console.log(
 	`Reminder: Azure App Registration with Client ID ${msalChromeExtensionAuthOptions.clientId} needs to have the following redirect and logout URI configured: ${msalChromeExtensionAuthOptions.redirectUri}`,
 )
 
-const client = new PublicClientApplication({
+// Some mock providers
+const defaultNavClient = new NavigationClient()
+const loggingNavClient: INavigationClient = {
+	navigateInternal: async (url, options) => {
+		console.warn(`NavigateInternal`, url, options)
+		return await defaultNavClient.navigateInternal(url, options)
+	},
+	navigateExternal: async (url, options) => {
+		console.warn(`NavigateExternal`, url, options)
+		return await defaultNavClient.navigateExternal(url, options)
+	},
+}
+
+const fetchClient = new FetchClient()
+const loggingNetworkClient: INetworkModule = {
+	async sendGetRequestAsync<T>(
+		url: string,
+		options?: NetworkRequestOptions,
+		timeout?: number,
+	): Promise<NetworkResponse<T>> {
+		console.warn('sendGetRequest', url, options, timeout)
+		return fetchClient.sendGetRequestAsync<T>(url, options)
+	},
+	async sendPostRequestAsync<T>(url: string, options?: NetworkRequestOptions): Promise<NetworkResponse<T>> {
+		console.warn('sendPostRequest', url, options)
+		const result = await fetchClient.sendPostRequestAsync<T>(url, options)
+		console.warn('sendPostRequest result', result)
+		return result
+	},
+}
+
+export const client = new PublicClientApplication({
 	auth: msalChromeExtensionAuthOptions,
 	system: {
 		loggerOptions: {
 			loggerCallback: (level, message) => {
 				console.log(`[MSAL] ${level}: ${message}`)
 			},
-			logLevel: LogLevel.Verbose,
+			logLevel: LogLevel.Trace,
 			piiLoggingEnabled: true,
 		},
+		// allowNativeBroker: true,
+		navigationClient: loggingNavClient, // Use the logging navigation client
+		networkClient: loggingNetworkClient, // Use the logging network client
 	},
 	cache: {
+		// Use localStorage to persist cache across sessions
 		cacheLocation: 'localStorage',
+		storeAuthStateInCookie: false, // Set to true if you want to store auth state in cookies (not recommended for extensions)
 	},
 })
 
@@ -159,14 +238,25 @@ export class AccountInfoTokenCredential implements TokenCredential {
 	}
 
 	async getToken(scopes: string | string[]): Promise<AccessToken | null> {
-		const msalToken = await client.acquireTokenSilent({
-			scopes: Array.isArray(scopes) ? scopes : [scopes],
-			account: this.account,
-		})
-		return {
-			tokenType: 'Bearer',
-			token: msalToken.accessToken,
-			expiresOnTimestamp: msalToken.expiresOn?.getTime() ?? Date.now() + 3600 * 1000, // Default to 1 hour if not set
+		try {
+			const msalToken = await client.acquireTokenSilent({
+				scopes: Array.isArray(scopes) ? scopes : [scopes],
+				account: this.account,
+				redirectUri: msalChromeExtensionAuthOptions.redirectUri,
+			})
+			if (!msalToken.accessToken) {
+				console.error('MSAL returned an empty access token:', msalToken)
+				throw new Error('Failed to acquire access token.')
+			}
+			return {
+				tokenType: 'Bearer',
+				token: msalToken.accessToken,
+				expiresOnTimestamp: msalToken.expiresOn?.getTime() ?? Date.now() + 3600 * 1000, // Default to 1 hour if not set
+			}
+		} catch (err) {
+			throwIfNotError(err)
+			console.error('Failed to acquire token silently:', err)
+			throw err
 		}
 	}
 }
