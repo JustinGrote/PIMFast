@@ -1,0 +1,39 @@
+diff --git a/dist/interaction_client/SilentIframeClient.mjs b/dist/interaction_client/SilentIframeClient.mjs
+index 2b3f9c1ac4e6b263527cef20d010ffd2c403945d..fa60db07235b4194c8191b64f6472ace161cfee9 100644
+--- a/dist/interaction_client/SilentIframeClient.mjs
++++ b/dist/interaction_client/SilentIframeClient.mjs
+@@ -104,11 +104,30 @@ class SilentIframeClient extends StandardInteractionClient {
+         });
+         // Create silent handler
+         const interactionHandler = new InteractionHandler(authClient, this.browserStorage, authCodeRequest, this.logger, this.performanceClient);
+-        // Get the frame handle for the silent request
+-        const msalFrame = await invokeAsync(initiateAuthRequest, PerformanceEvents.SilentHandlerInitiateAuthRequest, this.logger, this.performanceClient, correlationId)(navigateUrl, this.performanceClient, this.logger, correlationId, this.config.system.navigateFrameWait);
++
+         const responseType = this.config.auth.OIDCOptions.serverResponseType;
+-        // Monitor the window for the hash. Return the string value and close the popup when the hash is received. Default timeout is 60 seconds.
+-        const responseString = await invokeAsync(monitorIframeForHash, PerformanceEvents.SilentHandlerMonitorIframeForHash, this.logger, this.performanceClient, correlationId)(msalFrame, this.config.system.iframeHashTimeout, this.config.system.pollIntervalMilliseconds, this.performanceClient, this.logger, correlationId, responseType);
++        let responseString;
++
++        if (chrome?.identity?.launchWebAuthFlow) {
++            console.warn("MSAL PATCH: Using newer launchWebAuthFlow method instead of silent iframe");
++            try {
++                const authResponse = await chrome.identity.launchWebAuthFlow({
++                    url: navigateUrl,
++                    interactive: false,
++                    abortOnLoadForNonInteractive: false,
++                    timeoutMsForNonInteractive: 10000
++                });
++                responseString = authResponse.split("#")[1] || "";
++            } catch (error) {
++                console.warn("MSAL PATCH: launchWebAuthFlow failed, falling back to silent iframe", error);
++            }
++        } else {
++            // Get the frame handle for the silent request
++            const msalFrame = await invokeAsync(initiateAuthRequest, PerformanceEvents.SilentHandlerInitiateAuthRequest, this.logger, this.performanceClient, correlationId)(navigateUrl, this.performanceClient, this.logger, correlationId, this.config.system.navigateFrameWait);
++            // Monitor the window for the hash. Return the string value and close the popup when the hash is received. Default timeout is 60 seconds.
++            responseString = await invokeAsync(monitorIframeForHash, PerformanceEvents.SilentHandlerMonitorIframeForHash, this.logger, this.performanceClient, correlationId)(msalFrame, this.config.system.iframeHashTimeout, this.config.system.pollIntervalMilliseconds, this.performanceClient, this.logger, correlationId, responseType);
++        }
++
+         const serverParams = invoke(deserializeResponse, PerformanceEvents.DeserializeResponse, this.logger, this.performanceClient, this.correlationId)(responseString, responseType, this.logger);
+         if (serverParams.accountId) {
+             this.logger.verbose("Account id found in hash, calling WAM for token");

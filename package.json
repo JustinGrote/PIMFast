@@ -14,7 +14,7 @@
     "@azure/arm-resources-subscriptions": "^2.1.0",
     "@azure/arm-subscriptions": "^5.1.0",
     "@azure/identity": "^4.11.1",
-    "@azure/msal-browser": "^3.30.0",
+    "@azure/msal-browser": "3.30.0",
     "@formkit/auto-animate": "^0.8.2",
     "@mantine/core": "^8.2.5",
     "@mantine/dates": "^8.2.5",
@@ -53,5 +53,10 @@
     "typescript-eslint": "^8.39.1",
     "vite": "^7.1.2",
     "vite-plugin-zip-pack": "^1.2.4"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@azure/msal-browser@3.30.0": "patches/@azure__msal-browser@3.30.0.patch"
+    }
   }
 }
