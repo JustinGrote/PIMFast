@@ -1,8 +1,7 @@
 import { Subscription, SubscriptionClient, TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
-import { Client } from '@microsoft/microsoft-graph-client'
-import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials'
 import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
+import { getGraphClient } from './graph'
 
 export type TenantInformation = {
 	/** Primary domain name of a Microsoft Entra tenant. */
@@ -13,23 +12,6 @@ export type TenantInformation = {
 	federationBrandName: string
 	/** Unique identifier of a Microsoft Entra tenant. */
 	tenantId: string
-}
-
-const graphClients: Map<AccountInfoHomeId, Client> = new Map()
-
-/** Returns a singleton global client, per best practice */
-async function getGraphClient(account: AccountInfo): Promise<Client> {
-	const cacheKey = account.homeAccountId
-	let client: Client | undefined = graphClients.get(cacheKey)
-	if (!client) {
-		client = Client.initWithMiddleware({
-			authProvider: new TokenCredentialAuthenticationProvider(new AccountInfoTokenCredential(account), {
-				scopes: ['https://graph.microsoft.com/.default'],
-			}),
-		})
-		graphClients.set(cacheKey, client)
-	}
-	return client
 }
 
 const subscriptionClients: Map<AccountInfoHomeId, SubscriptionClient> = new Map()
