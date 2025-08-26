@@ -1,0 +1,15 @@
+diff --git a/dist/es/src/apiClientProxifier.js b/dist/es/src/apiClientProxifier.js
+index 748655aa7579398e0b3ef061f653b8550e2e26ed..dcd4c00fd114ebeaf5f423a5cd2bc0c8b77d406e 100644
+--- a/dist/es/src/apiClientProxifier.js
++++ b/dist/es/src/apiClientProxifier.js
+@@ -208,6 +208,10 @@ export const apiClientProxifier = (requestAdapter, pathParameters, navigationMet
+                         return apiClientProxifier(requestAdapter, downWardPathParameters, navigationCandidate.navigationMetadata, navigationCandidate.requestsMetadata);
+                     };
+                 }
++                if (name === "then") {
++                    // handle returning proxy from an async method
++                    return undefined
++                }
+                 throw new Error(`couldn't find navigation property ${name} data: ${JSON.stringify(navigationMetadata)}`);
+             }
+         },

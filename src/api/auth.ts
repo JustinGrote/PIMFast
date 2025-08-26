@@ -261,7 +261,6 @@ export class AccountInfoTokenCredential implements TokenCredential {
 	}
 }
 
-/** A AuthenticationProvider bridge between MSAL.js and the Graph SDK */
 const getAuthFlowResponseCode = (url: string) =>
 	url.includes('#')
 		? `#${url.split('#')[1]}`

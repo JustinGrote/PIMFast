@@ -1,7 +1,7 @@
 import { Subscription, SubscriptionClient, TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
-import { getGraphClient } from './graph'
+import { getGraphClient } from './graphClient'
 
 export type TenantInformation = {
 	/** Primary domain name of a Microsoft Entra tenant. */
