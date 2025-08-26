@@ -1,6 +1,6 @@
-import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/common/azureResourceId'
-import { getMilliseconds } from '@/common/time'
-import { throwIfNotError } from '@/common/util'
+import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/api/azureResourceId'
+import { getMilliseconds } from '@/api/time'
+import { throwIfNotError } from '@/api/util'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
@@ -16,12 +16,12 @@ import relativeTimePlugin from 'dayjs/plugin/relativeTime'
 import { DataTable, DataTableSortStatus } from 'mantine-datatable'
 import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
-import { getAllAccounts } from '../common/auth'
+import { getAllAccounts } from '../api/auth'
 import {
 	deactivateEligibleRole,
 	getMyRoleAssignmentScheduleInstances,
 	getMyRoleEligibilityScheduleInstances,
-} from '../common/pim'
+} from '../api/pim'
 import ResolvedTenantName from './ResolvedTenantName'
 import './RoleTable.css'
 

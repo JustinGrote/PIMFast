@@ -3,7 +3,7 @@ import { Alert, Button, Card, Container, Group, Loader, Stack, Text, Title } fro
 import { IconAlertCircle, IconBrandAzure } from '@tabler/icons-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { hasAuthenticatedAccounts, login } from '../common/auth'
+import { hasAuthenticatedAccounts, login } from '../api/auth'
 
 import './App.css'
 

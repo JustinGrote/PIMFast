@@ -1,4 +1,4 @@
-import { getAllAccounts, logout } from '@/common/auth'
+import { getAllAccounts, logout } from '@/api/auth'
 import { AccountInfo } from '@azure/msal-browser'
 import { useAutoAnimate } from '@formkit/auto-animate/react'
 import { ActionIcon, Group, Text, Tooltip } from '@mantine/core'

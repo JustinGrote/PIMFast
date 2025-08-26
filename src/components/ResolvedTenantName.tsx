@@ -5,9 +5,9 @@ import {
 	ResourceGroupId,
 	ResourceId,
 	SubscriptionId,
-} from '@/common/azureResourceId'
-import { fetchManagementGroup } from '@/common/managementGroups'
-import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/common/subscriptions'
+} from '@/api/azureResourceId'
+import { fetchManagementGroup } from '@/api/managementGroups'
+import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'

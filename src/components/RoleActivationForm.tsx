@@ -33,8 +33,8 @@
  * @see RoleActivationExample.tsx for complete usage examples
  */
 
-import { activateEligibleRole, EligibleRoleActivationRequest } from '@/common/pim'
-import { throwError } from '@/common/util'
+import { activateEligibleRole, EligibleRoleActivationRequest } from '@/api/pim'
+import { throwError } from '@/api/util'
 import { RoleAssignmentScheduleRequest } from '@azure/arm-authorization'
 import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { DateTimePicker } from '@mantine/dates'
