@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@azure/msal-browser@3.30.0':
-    hash: qzxduwunwubvo667a6lngwfdem
+    hash: 51af536d8a90615f6480bc1d2967e454062a0af35cc2a7f72d5ed82791c9c04b
     path: patches/@azure__msal-browser@3.30.0.patch
 
 importers:
@@ -16,6 +16,9 @@ importers:
       '@azure/arm-authorization':
         specifier: ^9.0.0
         version: 9.0.0
+      '@azure/arm-managementgroups':
+        specifier: ^2.0.2
+        version: 2.0.2
       '@azure/arm-resources-subscriptions':
         specifier: ^2.1.0
         version: 2.1.0
@@ -26,8 +29,8 @@ importers:
         specifier: ^4.11.1
         version: 4.11.1
       '@azure/msal-browser':
-        specifier: ^3.30.0
-        version: 3.30.0(patch_hash=qzxduwunwubvo667a6lngwfdem)
+        specifier: 3.30.0
+        version: 3.30.0(patch_hash=51af536d8a90615f6480bc1d2967e454062a0af35cc2a7f72d5ed82791c9c04b)
       '@formkit/auto-animate':
         specifier: ^0.8.2
         version: 0.8.2
@@ -48,7 +51,7 @@ importers:
         version: 8.2.5(@mantine/core@8.2.5(@mantine/hooks@8.2.5(react@19.1.1))(@types/react@19.1.10)(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(@mantine/hooks@8.2.5(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       '@microsoft/microsoft-graph-client':
         specifier: ^3.0.7
-        version: 3.0.7(@azure/identity@4.11.1)(@azure/msal-browser@3.30.0(patch_hash=qzxduwunwubvo667a6lngwfdem))
+        version: 3.0.7(@azure/identity@4.11.1)(@azure/msal-browser@3.30.0(patch_hash=51af536d8a90615f6480bc1d2967e454062a0af35cc2a7f72d5ed82791c9c04b))
       '@tabler/icons-react':
         specifier: ^3.34.1
         version: 3.34.1(react@19.1.1)
@@ -154,6 +157,10 @@ packages:
 
   '@azure/arm-authorization@9.0.0':
     resolution: {integrity: sha512-GdiCA8IA1gO+qcCbFEPj+iLC4+3ByjfKzmeAnkP7MdlL84Yo30Huo/EwbZzwRjYybXYUBuFxGPBB+yeTT4Ebxg==}
+    engines: {node: '>=14.0.0'}
+
+  '@azure/arm-managementgroups@2.0.2':
+    resolution: {integrity: sha512-vR5g/LDdyVI5zTUJrNCYks3AMU7TYUqbDbQ2lfhGvyf+6Vvi9qh3BHVYTFE963x7/M9oEINK2lPvl21/dxFNyA==}
     engines: {node: '>=14.0.0'}
 
   '@azure/arm-resources-subscriptions@2.1.0':
@@ -1909,6 +1916,18 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@azure/arm-managementgroups@2.0.2':
+    dependencies:
+      '@azure/abort-controller': 1.1.0
+      '@azure/core-auth': 1.10.0
+      '@azure/core-client': 1.10.0
+      '@azure/core-lro': 2.7.2
+      '@azure/core-paging': 1.6.2
+      '@azure/core-rest-pipeline': 1.22.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@azure/arm-resources-subscriptions@2.1.0':
     dependencies:
       '@azure/core-auth': 1.10.0
@@ -2011,7 +2030,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/msal-browser@3.30.0(patch_hash=qzxduwunwubvo667a6lngwfdem)':
+  '@azure/msal-browser@3.30.0(patch_hash=51af536d8a90615f6480bc1d2967e454062a0af35cc2a7f72d5ed82791c9c04b)':
     dependencies:
       '@azure/msal-common': 14.16.1
 
@@ -2386,13 +2405,13 @@ snapshots:
     dependencies:
       react: 19.1.1
 
-  '@microsoft/microsoft-graph-client@3.0.7(@azure/identity@4.11.1)(@azure/msal-browser@3.30.0(patch_hash=qzxduwunwubvo667a6lngwfdem))':
+  '@microsoft/microsoft-graph-client@3.0.7(@azure/identity@4.11.1)(@azure/msal-browser@3.30.0(patch_hash=51af536d8a90615f6480bc1d2967e454062a0af35cc2a7f72d5ed82791c9c04b))':
     dependencies:
       '@babel/runtime': 7.28.3
       tslib: 2.8.1
     optionalDependencies:
       '@azure/identity': 4.11.1
-      '@azure/msal-browser': 3.30.0(patch_hash=qzxduwunwubvo667a6lngwfdem)
+      '@azure/msal-browser': 3.30.0(patch_hash=51af536d8a90615f6480bc1d2967e454062a0af35cc2a7f72d5ed82791c9c04b)
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
