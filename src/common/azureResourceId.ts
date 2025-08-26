@@ -3,35 +3,69 @@
 import { throwIfNotError } from './util'
 
 /**
- * Base type for Azure Resource IDs
+ * Base class for Azure Resource IDs
  */
-export type AzureResourceIdBase = Readonly<{
-	/** Fully qualified resource ID for the resource */
-	resourceId: string
-	/** GUID identifier for the specific resource (e.g. 123e4567-e89b-12d3-a456-426614174000) */
-	id: string
-}>
+export class AzureResourceIdBase {
+	constructor(
+		public readonly resourceId: string,
+		public readonly id: string,
+	) {}
+}
 
-export type TenantId = AzureResourceIdBase
-export type ManagementGroupId = AzureResourceIdBase
-export type SubscriptionId = AzureResourceIdBase
+export class TenantId extends AzureResourceIdBase {
+	constructor(resourceId: string, id: string) {
+		super(resourceId, id)
+	}
+}
 
-export type ResourceGroupId = SubscriptionId &
-	Readonly<{
-		subscription: string
-	}>
+export class ManagementGroupId extends AzureResourceIdBase {
+	constructor(resourceId: string, id: string) {
+		super(resourceId, id)
+	}
+}
 
-export type ResourceId = ResourceGroupId &
-	Readonly<{
-		provider: string
-		type: string
-		resourceGroup: string
-	}>
+export class SubscriptionId extends AzureResourceIdBase {
+	constructor(resourceId: string, id: string) {
+		super(resourceId, id)
+	}
+}
 
-export type ChildResourceId = ResourceId &
-	Readonly<{
-		resource: string
-	}>
+export class ResourceGroupId extends SubscriptionId {
+	constructor(
+		resourceId: string,
+		id: string,
+		public readonly subscription: string,
+	) {
+		super(resourceId, id)
+	}
+}
+
+export class ResourceId extends ResourceGroupId {
+	constructor(
+		resourceId: string,
+		id: string,
+		subscription: string,
+		public readonly provider: string,
+		public readonly type: string,
+		public readonly resourceGroup: string,
+	) {
+		super(resourceId, id, subscription)
+	}
+}
+
+export class ChildResourceId extends ResourceId {
+	constructor(
+		resourceId: string,
+		id: string,
+		subscription: string,
+		provider: string,
+		type: string,
+		resourceGroup: string,
+		public readonly parentResource: string,
+	) {
+		super(resourceId, id, subscription, provider, type, resourceGroup)
+	}
+}
 
 export type AzureResourceId =
 	| TenantId
@@ -55,73 +89,65 @@ export function parseResourceId(resourceId: string): AzureResourceId {
 	 * - Resource: /subscriptions/{subId}/resourceGroups/{rg}/providers/{provider}/{type}/{name}
 	 * - Child Resource: /subscriptions/{subId}/resourceGroups/{rg}/providers/{provider}/{type}/{name}/{childType}/{childName}
 	 */
+
 	const patterns = [
 		{
 			// Tenant
 			regex: /^\/tenants\/(?<id>[^/]+)$/,
-			handler: (m: RegExpMatchArray): TenantId => {
-				const match = m.groups as TenantId
-				return {
-					...match,
-					resourceId,
-				}
+			handler: (m: RegExpMatchArray) => {
+				return new TenantId(resourceId, m.groups!.id)
 			},
 		},
 		{
 			// Management Group
 			regex: /^\/providers\/Microsoft\.Management\/managementGroups\/(?<id>[^/]+)$/,
-			handler: (m: RegExpMatchArray): ManagementGroupId => {
-				const match = m.groups as ManagementGroupId
-				return {
-					...match,
-					resourceId,
-				}
+			handler: (m: RegExpMatchArray) => {
+				return new ManagementGroupId(resourceId, m.groups!.id)
 			},
 		},
 		{
 			// Subscription
 			regex: /^\/subscriptions\/(?<id>[^/]+)$/,
-			handler: (m: RegExpMatchArray): SubscriptionId => {
-				const match = m.groups as SubscriptionId
-				return {
-					...match,
-					resourceId,
-				}
+			handler: (m: RegExpMatchArray) => {
+				return new SubscriptionId(resourceId, m.groups!.id)
 			},
 		},
 		{
 			// Resource Group
 			regex: /^\/subscriptions\/(?<subscription>[^/]+)\/resourceGroups\/(?<id>[^/]+)$/,
-			handler: (m: RegExpMatchArray): ResourceGroupId => {
-				const match = m.groups as ResourceGroupId
-				return {
-					...match,
-					resourceId,
-				}
+			handler: (m: RegExpMatchArray) => {
+				return new ResourceGroupId(resourceId, m.groups!.id, m.groups!.subscription)
 			},
 		},
 		{
 			// Resource
 			regex:
 				/^\/subscriptions\/(?<subscription>[^/]+)\/resourceGroups\/(?<resourceGroup>[^/]+)\/providers\/(?<provider>[^/]+)\/(?<type>[^/]+)\/(?<id>[^/]+)$/,
-			handler: (m: RegExpMatchArray): ResourceId => {
-				const match = m.groups as ResourceId
-				return {
-					...match,
+			handler: (m: RegExpMatchArray) => {
+				return new ResourceId(
 					resourceId,
-				}
+					m.groups!.id,
+					m.groups!.subscription,
+					m.groups!.provider,
+					m.groups!.type,
+					m.groups!.resourceGroup,
+				)
 			},
 		},
 		{
 			// Child Resource
 			regex:
 				/^\/subscriptions\/(?<subscription>[^/]+)\/resourceGroups\/(?<rg>[^/]+)\/providers\/(?<provider>[^/]+)\/(?<type>[^/]+)\/(?<name>[^/]+)\/(?<childType>[^/]+)\/(?<id>[^/]+)$/,
-			handler: (m: RegExpMatchArray): ChildResourceId => {
-				const match = m.groups as ChildResourceId
-				return {
-					...match,
+			handler: (m: RegExpMatchArray) => {
+				return new ChildResourceId(
 					resourceId,
-				}
+					m.groups!.id,
+					m.groups!.subscription,
+					m.groups!.provider,
+					m.groups!.type,
+					m.groups!.rg,
+					m.groups!.name,
+				)
 			},
 		},
 	]
@@ -153,6 +179,11 @@ export function getAzurePortalUrl(scope: string, scopeType?: string): string {
 	return `${baseUrl}${scope}`
 }
 
+/**
+ * Parses an Azure portal URL and extracts the resource ID
+ * @param portalUrl The Azure portal URL
+ * @returns The extracted resource ID
+ */
 /**
  * Parses an Azure portal URL and extracts the resource ID
  * @param portalUrl The Azure portal URL
