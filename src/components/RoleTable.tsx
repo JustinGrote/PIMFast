@@ -1,5 +1,4 @@
 import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/common/azureResourceId'
-import { fetchTenantNameBySubscriptionId, parseSubscriptionIdFromResourceId } from '@/common/subscriptions'
 import { getMilliseconds } from '@/common/time'
 import { throwIfNotError } from '@/common/util'
 import { AzureResource } from '@/components/icons/AzureResource'
@@ -7,7 +6,7 @@ import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
-import { useDisclosure, useMap } from '@mantine/hooks'
+import { useDisclosure } from '@mantine/hooks'
 import { IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
@@ -15,7 +14,7 @@ import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
 import { DataTable, DataTableSortStatus } from 'mantine-datatable'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../common/auth'
 import {
@@ -23,6 +22,7 @@ import {
 	getMyRoleAssignmentScheduleInstances,
 	getMyRoleEligibilityScheduleInstances,
 } from '../common/pim'
+import ResolvedTenantName from './ResolvedTenantName'
 import './RoleTable.css'
 
 dayjs.extend(durationPlugin)
@@ -39,8 +39,6 @@ export interface EligibleRole {
 }
 
 type EligibleRoleId = EligibleRole['id']
-type SubscriptionId = string
-type TenantDisplayName = string
 
 function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
@@ -168,61 +166,6 @@ function RoleTable() {
 		return dayjs().diff(dayjs(startDateTime), 'minutes') < AZURE_PIM_MIN_ACTIVATION_TIME
 	}
 
-	/** Some eligible roles are in other tenants, so we want to display friendly names for these, but the role doesn't have the tenant name, only the sub name, so we need to do some lookup and cache to keep this performant */
-	const subToTenantNameLookup = new Map<SubscriptionId, TenantDisplayName>()
-
-	const tenantNameMap = useMap<EligibleRoleId, TenantDisplayName>()
-	const eligibleRoles = eligibleRolesQuery.data ?? []
-
-	const fetchTenantNames = async () => {
-		if (!eligibleRoles.length) return
-
-		for (const role of eligibleRoles) {
-			const { account, schedule } = role
-
-			if (tenantNameMap.has(role.id)) continue
-
-			if (!schedule.scope) throw new Error('Schedule Doesnt have a scope. This is a bug and should not happen')
-			const subscriptionId = parseSubscriptionIdFromResourceId(schedule.scope)
-			if (!subscriptionId) throw new Error('Failed to parse subscription ID from schedule scope')
-
-			// Already discovered so skip, performance optimization
-			// This only changes rarely if a subscription is moved between tenants
-			if (subToTenantNameLookup.has(subscriptionId)) {
-				tenantNameMap.set(role.id, subToTenantNameLookup.get(subscriptionId)!)
-				continue
-			}
-
-			let tenantName: TenantDisplayName | undefined
-			console.debug(`Fetching tenant name for subscription ${subscriptionId} in account ${account.homeAccountId}`)
-
-			try {
-				tenantName = await fetchTenantNameBySubscriptionId(account, subscriptionId)
-			} catch (err) {
-				if (!(err instanceof Error)) throw err
-
-				// If we couldn't find the tenant name, we need to handle this case
-				console.warn(`Failed to fetch tenant name for subscription ${subscriptionId}: ${err.message}`)
-				continue
-			}
-
-			if (!tenantName) {
-				// If we couldn't find the tenant name, we need to handle this case
-				console.warn(`Tenant name for subscription ${subscriptionId} returned undefined`)
-				continue
-			}
-
-			console.debug(`Found tenant name "${tenantName}" for subscription ${subscriptionId}`)
-
-			subToTenantNameLookup.set(subscriptionId, tenantName)
-			tenantNameMap.set(role.id, tenantName)
-		}
-	}
-
-	useEffect(() => {
-		fetchTenantNames()
-	}, [eligibleRoles])
-
 	async function handleActivateClick(eligibleRole: EligibleRole) {
 		setSelectedRole(eligibleRole)
 		if (!isEligibleRoleActivated(eligibleRole)) {
@@ -234,7 +177,7 @@ function RoleTable() {
 
 	// Filter and sort the eligible roles
 	const filteredAndSortedRoles = useMemo(() => {
-		let filtered: EligibleRole[] = eligibleRoles
+		let filtered: EligibleRole[] = eligibleRolesQuery.data ?? []
 
 		// Apply search filter
 		if (filterQuery) {
@@ -243,13 +186,11 @@ function RoleTable() {
 				const accountName = role.account.name?.toLowerCase() || ''
 				const roleName = role.schedule.expandedProperties?.roleDefinition?.displayName?.toLowerCase() || ''
 				const scopeName = role.schedule.expandedProperties?.scope?.displayName?.toLowerCase() || ''
-				const tenantName = tenantNameMap.get(role.id)?.toLowerCase() || ''
+				// TODO: Fix tenant search
 
 				return (
-					accountName.includes(lowerQuery) ||
-					roleName.includes(lowerQuery) ||
-					scopeName.includes(lowerQuery) ||
-					tenantName.includes(lowerQuery)
+					accountName.includes(lowerQuery) || roleName.includes(lowerQuery) || scopeName.includes(lowerQuery)
+					// tenantName.includes(lowerQuery)
 				)
 			})
 		}
@@ -273,10 +214,10 @@ function RoleTable() {
 						aValue = a.schedule.expandedProperties?.scope?.displayName || ''
 						bValue = b.schedule.expandedProperties?.scope?.displayName || ''
 						break
-					case 'tenant':
-						aValue = tenantNameMap.get(a.id) || ''
-						bValue = tenantNameMap.get(b.id) || ''
-						break
+					// case 'tenant':
+					// 	aValue = tenantNameMap.get(a.id) || ''
+					// 	bValue = tenantNameMap.get(b.id) || ''
+					// 	break
 					default:
 						return 0
 				}
@@ -287,7 +228,7 @@ function RoleTable() {
 		}
 
 		return filtered
-	}, [filterQuery, sortStatus, eligibleRoles, tenantNameMap])
+	}, [filterQuery, sortStatus, eligibleRolesQuery.data])
 
 	return (
 		<>
@@ -408,13 +349,11 @@ function RoleTable() {
 								title: 'Tenant',
 								sortable: true,
 								render: eligibleRole => {
-									const { schedule } = eligibleRole
-									if (!schedule.scope) return <span>Unknown</span>
-									const tenantName = tenantNameMap.get(eligibleRole.id) || 'Unknown'
 									return (
-										<Skeleton visible={!tenantName}>
-											<span>{tenantName}</span>
-										</Skeleton>
+										<ResolvedTenantName
+											account={eligibleRole.account}
+											roleOrTenantId={eligibleRole}
+										/>
 									)
 								},
 							},

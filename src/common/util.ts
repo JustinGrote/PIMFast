@@ -12,7 +12,6 @@ export function throwIfNotError(value: unknown): asserts value is Error {
 		throw value
 	}
 }
-
 /** Enables throwing of errors from places a direct throw isn't support, such as in null conditionals (??) */
 export function throwError(message: string | string[], cause?: string): never {
 	throw new Error(Array.isArray(message) ? message.join(', ') : message, {

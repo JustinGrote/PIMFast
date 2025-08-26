@@ -115,6 +115,12 @@ export async function fetchTenantNameBySubscriptionId(
 	return tenantInfo.displayName
 }
 
+export async function findTenantNameByTenantId(account: AccountInfo, tenantId: string): Promise<string | undefined> {
+	const tenants = await fetchTenants(account)
+	const tenant = tenants.find(({ tenantId: id }) => id === tenantId)
+	return tenant?.displayName
+}
+
 export function parseSubscriptionIdFromResourceId(resourceId: string): string | null {
 	const match = resourceId.match(/subscriptions\/([^/]+)/)
 	return match ? match[1] : null
