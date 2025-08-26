@@ -295,12 +295,6 @@ function RoleTable() {
 						records={filteredAndSortedRoles}
 						columns={[
 							{
-								accessor: 'account',
-								title: 'Account',
-								sortable: true,
-								render: eligibleRole => <span title={eligibleRole.account.username}>{eligibleRole.account.name}</span>,
-							},
-							{
 								accessor: 'roleDefinition',
 								title: 'Role',
 								sortable: true,
@@ -345,9 +339,15 @@ function RoleTable() {
 								},
 							},
 							{
+								accessor: 'account',
+								title: 'Account',
+								sortable: true,
+								render: eligibleRole => <span title={eligibleRole.account.username}>{eligibleRole.account.name}</span>,
+							},
+							{
 								accessor: 'tenant',
 								title: 'Tenant',
-								sortable: true,
+								sortable: false, //TODO: Reimplement
 								render: eligibleRole => {
 									return (
 										<ResolvedTenantName

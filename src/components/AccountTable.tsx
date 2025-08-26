@@ -6,6 +6,7 @@ import { notifications } from '@mantine/notifications'
 import { IconX } from '@tabler/icons-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { DataTable } from 'mantine-datatable'
+import ResolvedTenantName from './ResolvedTenantName'
 
 export default function AccountTable() {
 	const [bodyRef] = useAutoAnimate<HTMLTableSectionElement>()
@@ -64,6 +65,12 @@ export default function AccountTable() {
 				{
 					accessor: 'tenantId',
 					title: 'Tenant ID',
+					render: (account: AccountInfo) => (
+						<ResolvedTenantName
+							account={account}
+							roleOrTenantId={account.tenantId}
+						/>
+					),
 				},
 				{
 					accessor: 'actions',
