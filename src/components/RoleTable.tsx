@@ -15,7 +15,7 @@ import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/a
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { DataTable, DataTableSortStatus } from 'mantine-datatable'
+import { DataTable, DataTableSortStatus, useDataTableColumns } from 'mantine-datatable'
 import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../api/auth'
@@ -43,6 +43,149 @@ function RoleTable() {
 		columnAccessor: 'account',
 		direction: 'asc',
 	})
+	const storeColumnsKey = 'eligibleRoles'
+	const { effectiveColumns, resetColumnsOrder } = useDataTableColumns<EligibleRole>({
+		key: storeColumnsKey,
+		columns: [
+			{
+				accessor: 'roleDefinition',
+				title: 'Role',
+				resizable: true,
+				sortable: true,
+				render: eligibleRole => (
+					<div>
+						<span title={eligibleRole.schedule.roleDefinitionId || ''}>
+							{eligibleRole.schedule.roleDefinitionDisplayName ?? 'unknown'}
+						</span>
+					</div>
+				),
+			},
+			{
+				accessor: 'scope',
+				title: 'Scope',
+				resizable: true,
+				sortable: true,
+				render: ({ schedule }) => {
+					const icon = match(schedule.scopeType)
+						.with('resourcegroup', () => <ResourceGroups />)
+						.with('subscription', () => <Subscriptions />)
+						.with('managementgroup', () => <ManagementGroups />)
+						.with('directory', () => <AzureResource />)
+						.with('group', () => <IconUsers size={16} />)
+						.otherwise(() => <AzureResource />)
+					const displayName = schedule.scopeDisplayName ?? 'unknown'
+					const portalUrl = schedule.scope ? getAzurePortalUrl(schedule.scope, schedule.scopeType) : '#'
+
+					return (
+						<Group
+							gap="xs"
+							wrap="nowrap"
+							style={{ minWidth: 0, flex: 1 }}
+						>
+							{icon}
+							<a
+								href={portalUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								title={schedule.scope ?? ''}
+								style={{
+									textDecoration: 'none',
+									color: 'inherit',
+									overflow: 'hidden',
+									textOverflow: 'ellipsis',
+									whiteSpace: 'nowrap',
+									minWidth: 0,
+									flex: 1,
+								}}
+							>
+								{displayName}
+							</a>
+						</Group>
+					)
+				},
+			},
+			{
+				accessor: 'account',
+				title: 'Account',
+				sortable: true,
+				resizable: true,
+				render: eligibleRole => <span title={eligibleRole.account.username}>{eligibleRole.account.name}</span>,
+			},
+			{
+				accessor: 'tenant',
+				title: 'Tenant',
+				resizable: true,
+				sortable: false, //TODO: Reimplement
+				render: eligibleRole => {
+					return (
+						<ResolvedTenantName
+							account={eligibleRole.account}
+							roleOrTenantId={eligibleRole}
+						/>
+					)
+				},
+			},
+			{
+				accessor: 'actions',
+				title: (
+					<Center>
+						<IconClick size={16} />
+					</Center>
+				),
+				resizable: false,
+				render: eligibleRole => (
+					<div className="one-line-row">
+						<Group>
+							<ActionIcon
+								size="sm"
+								variant="subtle"
+								disabled={!canActivateRole(eligibleRole) || isEligibleRoleNewlyActivated(eligibleRole)}
+								onClick={() => {
+									handleActivateClick(eligibleRole)
+								}}
+								loaderProps={{
+									color: 'blue',
+								}}
+							>
+								<Skeleton visible={!roleStatusQuery.isSuccess}>
+									{!canActivateRole(eligibleRole) ? (
+										<IconClick
+											size="sm"
+											color="gray"
+											title={
+												eligibleRole.schedule.sourceType === 'graph'
+													? 'Entra ID role activation not yet supported'
+													: eligibleRole.schedule.sourceType === 'group'
+														? 'Group role activation not yet supported'
+														: 'Role activation not supported'
+											}
+										/>
+									) : isEligibleRoleActivated(eligibleRole) ? (
+										<IconPlayerStop
+											size="sm"
+											color={isEligibleRoleNewlyActivated(eligibleRole) ? undefined : 'red'}
+											title={
+												isEligibleRoleNewlyActivated(eligibleRole)
+													? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
+													: 'Deactivate Role'
+											}
+										/>
+									) : (
+										<IconPlayerPlay
+											size="sm"
+											color="green"
+											title="Activate Role"
+										/>
+									)}
+								</Skeleton>
+							</ActionIcon>
+						</Group>
+					</div>
+				),
+			},
+		],
+	})
+
 	const queryClient = useQueryClient()
 	const [filterQuery, setFilterQuery] = useState('')
 
@@ -341,139 +484,8 @@ function RoleTable() {
 						// selectedRecords={selectedSchedules}
 						// onSelectedRecordsChange={setSelectedSchedules}
 						records={filteredAndSortedRoles}
-						columns={[
-							{
-								accessor: 'roleDefinition',
-								title: 'Role',
-								sortable: true,
-								render: eligibleRole => (
-									<div>
-										<span title={eligibleRole.schedule.roleDefinitionId || ''}>
-											{eligibleRole.schedule.roleDefinitionDisplayName ?? 'unknown'}
-										</span>
-									</div>
-								),
-							},
-							{
-								accessor: 'scope',
-								title: 'Scope',
-								sortable: true,
-								render: ({ schedule }) => {
-									const icon = match(schedule.scopeType)
-										.with('resourcegroup', () => <ResourceGroups />)
-										.with('subscription', () => <Subscriptions />)
-										.with('managementgroup', () => <ManagementGroups />)
-										.with('directory', () => <AzureResource />)
-										.with('group', () => <IconUsers size={16} />)
-										.otherwise(() => <AzureResource />)
-									const displayName = schedule.scopeDisplayName ?? 'unknown'
-									const portalUrl = schedule.scope ? getAzurePortalUrl(schedule.scope, schedule.scopeType) : '#'
-
-									return (
-										<Group
-											gap="xs"
-											wrap="nowrap"
-										>
-											{icon}
-											<a
-												href={portalUrl}
-												target="_blank"
-												rel="noopener noreferrer"
-												title={schedule.scope ?? ''}
-												style={{ textDecoration: 'none', color: 'inherit' }}
-											>
-												{displayName}
-											</a>
-										</Group>
-									)
-								},
-							},
-							{
-								accessor: 'account',
-								title: 'Account',
-								sortable: true,
-								render: eligibleRole => <span title={eligibleRole.account.username}>{eligibleRole.account.name}</span>,
-							},
-							{
-								accessor: 'tenant',
-								title: 'Tenant',
-								sortable: false, //TODO: Reimplement
-								render: eligibleRole => {
-									return (
-										<ResolvedTenantName
-											account={eligibleRole.account}
-											roleOrTenantId={eligibleRole}
-										/>
-									)
-								},
-							},
-							{
-								accessor: 'actions',
-								title: (
-									<Center>
-										<IconClick size={16} />
-									</Center>
-								),
-								render: eligibleRole => (
-									<div className="one-line-row">
-										<Group>
-											<ActionIcon
-												size="sm"
-												variant="subtle"
-												disabled={!canActivateRole(eligibleRole) || isEligibleRoleNewlyActivated(eligibleRole)}
-												onClick={() => {
-													handleActivateClick(eligibleRole)
-												}}
-												loaderProps={{
-													color: 'blue',
-												}}
-											>
-												<Skeleton visible={!roleStatusQuery.isSuccess}>
-													{!canActivateRole(eligibleRole) ? (
-														<IconClick
-															size="sm"
-															color="gray"
-															title={
-																eligibleRole.schedule.sourceType === 'graph'
-																	? 'Entra ID role activation not yet supported'
-																	: eligibleRole.schedule.sourceType === 'group'
-																		? 'Group role activation not yet supported'
-																		: 'Role activation not supported'
-															}
-														/>
-													) : isEligibleRoleActivated(eligibleRole) ? (
-														<IconPlayerStop
-															size="sm"
-															color={isEligibleRoleNewlyActivated(eligibleRole) ? undefined : 'red'}
-															title={
-																isEligibleRoleNewlyActivated(eligibleRole)
-																	? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
-																	: 'Deactivate Role'
-															}
-														/>
-													) : (
-														<IconPlayerPlay
-															size="sm"
-															color="green"
-															title="Activate Role"
-														/>
-													)}
-												</Skeleton>
-											</ActionIcon>
-										</Group>
-									</div>
-								),
-							},
-							// FIXME: Work in progress for reporting how long an active is ready
-							// {
-							// 	accessor: 'ActiveUntil',
-							// 	title: 'Active Until',
-
-							// 	render: eligibleRole => {
-							// 		const { schedule } = eligibleRole
-							// 	},
-							// },
-						]}
+						storeColumnsKey={storeColumnsKey}
+						columns={effectiveColumns}
 					/>
 				</Stack>
 			</Paper>
