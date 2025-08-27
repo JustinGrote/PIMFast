@@ -9,7 +9,15 @@ import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authoriz
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch, IconUsers } from '@tabler/icons-react'
+import {
+	IconClearAll,
+	IconClick,
+	IconPlayerPlay,
+	IconPlayerStop,
+	IconRefresh,
+	IconSearch,
+	IconUsers,
+} from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
@@ -28,6 +36,7 @@ import {
 	getMyEntraGroupEligibilityScheduleInstances,
 	getMyEntraRoleEligibilityScheduleInstances,
 } from '../api/pimGraph'
+import ExpiresCountdown from './ExpiresCountdown'
 import ResolvedTenantName from './ResolvedTenantName'
 import './RoleTable.css'
 
@@ -101,6 +110,19 @@ function RoleTable() {
 								{displayName}
 							</a>
 						</Group>
+					)
+				},
+			},
+			{
+				title: 'Expires',
+				accessor: 'expires',
+				resizable: true,
+				sortable: false,
+				render: eligibleRole => {
+					return eligibleRole.schedule.endDateTime ? (
+						<ExpiresCountdown futureDate={eligibleRole.schedule.endDateTime} />
+					) : (
+						<span title="No expiration">Permanent</span>
 					)
 				},
 			},
@@ -434,16 +456,27 @@ function RoleTable() {
 						align="center"
 					>
 						<Title order={2}>Eligible Roles</Title>
-						<Button
-							disabled={eligibleRolesQuery.isFetching}
-							variant="subtle"
-							color="green"
-							size="compact-xs"
-							styles={{ root: { height: '1.5rem', minHeight: 'unset', padding: '0 0.3rem' } }}
-							onClick={refresh}
-						>
-							<IconRefresh size="0.9rem" />
-						</Button>
+						<Group>
+							<Button
+								disabled={eligibleRolesQuery.isFetching}
+								variant="subtle"
+								color="green"
+								size="compact-xs"
+								styles={{ root: { height: '1.5rem', minHeight: 'unset', padding: '0 0.3rem' } }}
+								onClick={refresh}
+							>
+								<IconRefresh size="0.9rem" />
+							</Button>
+							<Button
+								variant="subtle"
+								color="gray"
+								size="compact-xs"
+								styles={{ root: { height: '1.5rem', minHeight: 'unset', padding: '0 0.3rem' } }}
+								onClick={resetColumnsOrder}
+							>
+								<IconClearAll size="0.9rem" />
+							</Button>
+						</Group>
 					</Group>
 
 					<TextInput
