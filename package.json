@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "buildPimClient": "pnpm dlx @kiota-community/kiota-gen generate --openapi https://aka.ms/graph/v1.0/openapi.yaml --include-path /roleManagement/directory/** -l TypeScript -o src/api/generated/msgraph -c PimGraphClient"
+    "buildPimClient": "pnpm dlx @kiota-community/kiota-gen generate --openapi https://aka.ms/graph/v1.0/openapi.yaml --include-path /roleManagement/directory/** --include-path /identityGovernance/privilegedAccess/group/** -l TypeScript -o src/api/generated/msgraph -c PimGraphClient"
   },
   "dependencies": {
     "@azure/arm-authorization": "^9.0.0",

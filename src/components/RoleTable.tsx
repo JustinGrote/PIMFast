@@ -3,7 +3,9 @@ import { getMilliseconds } from '@/api/time'
 import { throwIfNotError } from '@/api/util'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { KnownStatus, RoleAssignmentScheduleInstance, RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
+import { armScheduleToCommon, graphScheduleToCommon } from '@/model/CommonRoleSchedule'
+import { EligibleRole } from '@/model/EligibleRole'
+import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
@@ -22,6 +24,7 @@ import {
 	getMyRoleAssignmentScheduleInstances,
 	getMyRoleEligibilityScheduleInstances,
 } from '../api/pim'
+import { getMyEntraRoleEligibilityScheduleInstances } from '../api/pimGraph'
 import ResolvedTenantName from './ResolvedTenantName'
 import './RoleTable.css'
 
@@ -29,16 +32,6 @@ dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
 
 // FIXME: Handle if a tenant doesn't have P2 license
-
-/** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
-export interface EligibleRole {
-	account: AccountInfo
-	schedule: RoleEligibilityScheduleInstance
-	/** Set to a hyphenated string of account HomeAccountId and schedule Id. Has to be unique for row processing */
-	id: string
-}
-
-type EligibleRoleId = EligibleRole['id']
 
 function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
@@ -79,16 +72,36 @@ function RoleTable() {
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
 			const allEligibleRoles: EligibleRole[] = []
+
 			for (const account of accounts) {
-				const scheduleInstances = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(account))
-				for (const schedule of scheduleInstances) {
+				// Fetch ARM-based Azure Resource roles
+				const armScheduleInstances = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(account))
+				for (const schedule of armScheduleInstances) {
+					const commonSchedule = armScheduleToCommon(schedule)
 					allEligibleRoles.push({
 						account,
-						schedule,
-						id: `${account.homeAccountId}-${schedule.id}`,
+						schedule: commonSchedule,
+						id: `${account.homeAccountId}-arm-${commonSchedule.id}`,
 					})
 				}
+
+				// Fetch Graph-based Entra ID roles
+				try {
+					const graphScheduleInstances = await getMyEntraRoleEligibilityScheduleInstances(account)
+					for (const schedule of graphScheduleInstances) {
+						const commonSchedule = graphScheduleToCommon(schedule)
+						allEligibleRoles.push({
+							account,
+							schedule: commonSchedule,
+							id: `${account.homeAccountId}-graph-${commonSchedule.id}`,
+						})
+					}
+				} catch (error) {
+					console.warn('Failed to fetch Entra ID roles for account:', account.name, error)
+					// Continue with ARM roles even if Graph roles fail
+				}
 			}
+
 			return allEligibleRoles
 		},
 	})
@@ -120,7 +133,7 @@ function RoleTable() {
 		},
 	})
 
-	type RoleToStatusLookup = Record<EligibleRoleId, RoleAssignmentScheduleInstance | undefined>
+	type RoleToStatusLookup = Record<EligibleRole['id'], RoleAssignmentScheduleInstance | undefined>
 	const roleStatusQuery = useQuery<RoleToStatusLookup>({
 		queryKey: [
 			'pim',
@@ -135,9 +148,15 @@ function RoleTable() {
 			const eligibleRoles = eligibleRolesQuery.data ?? []
 
 			for (const role of eligibleRoles) {
-				roleToStatusLookup[role.id] = roleAssignmentAccountMap[role.account.homeAccountId]?.find(
-					assignment => assignment.linkedRoleEligibilityScheduleInstanceId === role.schedule.id,
-				)
+				// Only ARM-based roles can be checked via role assignment schedule instances
+				if (role.schedule.sourceType === 'arm') {
+					roleToStatusLookup[role.id] = roleAssignmentAccountMap[role.account.homeAccountId]?.find(
+						assignment => assignment.linkedRoleEligibilityScheduleInstanceId === role.schedule.id,
+					)
+				} else {
+					// Graph-based roles would need a different status checking mechanism
+					roleToStatusLookup[role.id] = undefined
+				}
 			}
 			return roleToStatusLookup
 		},
@@ -157,6 +176,11 @@ function RoleTable() {
 		return roleStatusQuery.data[role.id]?.status === KnownStatus.Provisioned
 	}
 
+	/** Check if a role can be activated - currently only ARM-based roles are supported */
+	function canActivateRole(role: EligibleRole): boolean {
+		return role.schedule.sourceType === 'arm'
+	}
+
 	/** Azure PIM has a undocumented requirement that a role must be activated at least 5 minutes before it can be deactivated. We use this function to determine if that is the case, for purposes of disabling the stop button for instance */
 	function isEligibleRoleNewlyActivated(role: EligibleRole): boolean {
 		const AZURE_PIM_MIN_ACTIVATION_TIME = 5
@@ -167,6 +191,11 @@ function RoleTable() {
 	}
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
+		if (!canActivateRole(eligibleRole)) {
+			console.warn('Role activation not supported for this role type:', eligibleRole.schedule.sourceType)
+			return
+		}
+
 		setSelectedRole(eligibleRole)
 		if (!isEligibleRoleActivated(eligibleRole)) {
 			openActivationModal()
@@ -184,8 +213,8 @@ function RoleTable() {
 			const lowerQuery = filterQuery.toLowerCase()
 			filtered = filtered.filter(role => {
 				const accountName = role.account.name?.toLowerCase() || ''
-				const roleName = role.schedule.expandedProperties?.roleDefinition?.displayName?.toLowerCase() || ''
-				const scopeName = role.schedule.expandedProperties?.scope?.displayName?.toLowerCase() || ''
+				const roleName = role.schedule.roleDefinitionDisplayName?.toLowerCase() || ''
+				const scopeName = role.schedule.scopeDisplayName?.toLowerCase() || ''
 				// TODO: Fix tenant search
 
 				return (
@@ -207,12 +236,12 @@ function RoleTable() {
 						bValue = b.account.name || ''
 						break
 					case 'roleDefinition':
-						aValue = a.schedule.expandedProperties?.roleDefinition?.displayName || ''
-						bValue = b.schedule.expandedProperties?.roleDefinition?.displayName || ''
+						aValue = a.schedule.roleDefinitionDisplayName || ''
+						bValue = b.schedule.roleDefinitionDisplayName || ''
 						break
 					case 'scope':
-						aValue = a.schedule.expandedProperties?.scope?.displayName || ''
-						bValue = b.schedule.expandedProperties?.scope?.displayName || ''
+						aValue = a.schedule.scopeDisplayName || ''
+						bValue = b.schedule.scopeDisplayName || ''
 						break
 					// case 'tenant':
 					// 	aValue = tenantNameMap.get(a.id) || ''
@@ -299,9 +328,11 @@ function RoleTable() {
 								title: 'Role',
 								sortable: true,
 								render: eligibleRole => (
-									<span title={eligibleRole.schedule.roleDefinitionId || ''}>
-										{eligibleRole.schedule.expandedProperties?.roleDefinition?.displayName ?? 'unknown'}
-									</span>
+									<div>
+										<span title={eligibleRole.schedule.roleDefinitionId || ''}>
+											{eligibleRole.schedule.roleDefinitionDisplayName ?? 'unknown'}
+										</span>
+									</div>
 								),
 							},
 							{
@@ -309,15 +340,14 @@ function RoleTable() {
 								title: 'Scope',
 								sortable: true,
 								render: ({ schedule }) => {
-									const icon = match(schedule.expandedProperties?.scope?.type)
+									const icon = match(schedule.scopeType)
 										.with('resourcegroup', () => <ResourceGroups />)
 										.with('subscription', () => <Subscriptions />)
 										.with('managementgroup', () => <ManagementGroups />)
+										.with('directory', () => <AzureResource />)
 										.otherwise(() => <AzureResource />)
-									const displayName = schedule.expandedProperties?.scope?.displayName ?? 'unknown'
-									const portalUrl = schedule.scope
-										? getAzurePortalUrl(schedule.scope, schedule.expandedProperties?.scope?.type)
-										: '#'
+									const displayName = schedule.scopeDisplayName ?? 'unknown'
+									const portalUrl = schedule.scope ? getAzurePortalUrl(schedule.scope, schedule.scopeType) : '#'
 
 									return (
 										<Group
@@ -370,7 +400,7 @@ function RoleTable() {
 											<ActionIcon
 												size="sm"
 												variant="subtle"
-												disabled={isEligibleRoleNewlyActivated(eligibleRole)}
+												disabled={!canActivateRole(eligibleRole) || isEligibleRoleNewlyActivated(eligibleRole)}
 												onClick={() => {
 													handleActivateClick(eligibleRole)
 												}}
@@ -379,7 +409,13 @@ function RoleTable() {
 												}}
 											>
 												<Skeleton visible={!roleStatusQuery.isSuccess}>
-													{isEligibleRoleActivated(eligibleRole) ? (
+													{!canActivateRole(eligibleRole) ? (
+														<IconClick
+															size="sm"
+															color="gray"
+															title="Graph-based role activation not yet supported"
+														/>
+													) : isEligibleRoleActivated(eligibleRole) ? (
 														<IconPlayerStop
 															size="sm"
 															color={isEligibleRoleNewlyActivated(eligibleRole) ? undefined : 'red'}
@@ -393,6 +429,7 @@ function RoleTable() {
 														<IconPlayerPlay
 															size="sm"
 															color="green"
+															title="Activate Role"
 														/>
 													)}
 												</Skeleton>

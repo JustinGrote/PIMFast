@@ -1,4 +1,4 @@
-import { EligibleRole } from '@/components/RoleTable'
+import { EligibleRole } from '@/model/EligibleRole'
 import {
 	AuthorizationManagementClient,
 	RoleAssignmentScheduleInstance,
@@ -118,27 +118,45 @@ export async function activateEligibleRole(
 export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 	const { account, schedule } = eligibleRole
 	const client = getPimClient(account)
-	if (!schedule.scope) throwError('scope doesnt exist')
-	if (!schedule.id) throwError('id doesnt exist')
-	return await client.roleAssignmentScheduleRequests.create(schedule.scope, crypto.randomUUID(), {
-		requestType: 'SelfDeactivate',
-		principalId: account.localAccountId,
-		roleDefinitionId: schedule.roleDefinitionId,
-	})
+
+	// For ARM-based schedules, we need the original schedule
+	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
+		const armSchedule = schedule.originalSchedule as RoleEligibilityScheduleInstance
+		if (!armSchedule.scope) throwError('scope doesnt exist')
+		if (!armSchedule.id) throwError('id doesnt exist')
+		return await client.roleAssignmentScheduleRequests.create(armSchedule.scope, crypto.randomUUID(), {
+			requestType: 'SelfDeactivate',
+			principalId: account.localAccountId,
+			roleDefinitionId: armSchedule.roleDefinitionId,
+		})
+	} else {
+		// For Graph-based schedules, we need to implement the Graph API deactivation
+		// This would require using the Graph PIM client instead
+		throw new Error('Graph-based role deactivation is not yet implemented')
+	}
 }
 
 /** Check a role status by fetching its request and seeing if it links back to the schedule */
 export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
 	const { account, schedule } = eligibleRole
 	const client = getPimClient(account)
-	const scopedAssignments = client.roleAssignmentScheduleInstances.listForScope(
-		schedule.scope ?? throwError('Missing schedule scope'),
-		{ filter: MY_ROLES_ONLY },
-	)
-	for await (const assignment of scopedAssignments) {
-		if (assignment.linkedRoleEligibilityScheduleInstanceId === schedule.id) {
-			return assignment
+
+	// For ARM-based schedules, we need the original schedule
+	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
+		const armSchedule = schedule.originalSchedule as RoleEligibilityScheduleInstance
+		const scopedAssignments = client.roleAssignmentScheduleInstances.listForScope(
+			armSchedule.scope ?? throwError('Missing schedule scope'),
+			{ filter: MY_ROLES_ONLY },
+		)
+		for await (const assignment of scopedAssignments) {
+			if (assignment.linkedRoleEligibilityScheduleInstanceId === armSchedule.id) {
+				return assignment
+			}
 		}
+	} else {
+		// For Graph-based schedules, we need to implement the Graph API assignment lookup
+		// This would require using the Graph PIM client instead
+		throw new Error('Graph-based role assignment lookup is not yet implemented')
 	}
 }
 

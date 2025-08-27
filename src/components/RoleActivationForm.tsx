@@ -35,6 +35,7 @@
 
 import { activateEligibleRole, EligibleRoleActivationRequest } from '@/api/pim'
 import { throwError } from '@/api/util'
+import { EligibleRole } from '@/model/EligibleRole'
 import { RoleAssignmentScheduleRequest } from '@azure/arm-authorization'
 import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { DateTimePicker } from '@mantine/dates'
@@ -45,7 +46,6 @@ import { useMutation } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import { useState } from 'react'
-import { EligibleRole } from './RoleTable'
 
 dayjs.extend(durationPlugin)
 
@@ -144,6 +144,13 @@ export function RoleActivationForm({
 		{ durationMinutes, justification, startTime, ticketNumber }: FormValues,
 		{ account, schedule }: EligibleRole = eligibleRole,
 	): EligibleRoleActivationRequest {
+		// For ARM-based schedules, we need the original schedule
+		if (schedule.sourceType !== 'arm' || !schedule.originalSchedule) {
+			throw new Error('Only ARM-based role activation is currently supported')
+		}
+
+		const armSchedule = schedule.originalSchedule as any // ARM schedule type
+
 		return {
 			requestType: 'SelfActivate',
 			scope: schedule.scope ?? throwError('Scope is required'),
@@ -151,7 +158,7 @@ export function RoleActivationForm({
 			justification,
 			ticketInfo: ticketNumber ? { ticketNumber } : undefined,
 			linkedRoleEligibilityScheduleId:
-				schedule.roleEligibilityScheduleId ??
+				armSchedule.roleEligibilityScheduleId ??
 				throwError(
 					'This is not a eligible role (missing linkedEligibileRoleId). This is a bug and you should report it.',
 				),
@@ -180,16 +187,13 @@ export function RoleActivationForm({
 							size="sm"
 							c="dimmed"
 						>
-							Role: {eligibleRole.schedule.expandedProperties?.roleDefinition?.displayName ?? 'Unknown Role'}
+							Role: {eligibleRole.schedule.roleDefinitionDisplayName ?? 'Unknown Role'}
 						</Text>
 						<Text
 							size="sm"
 							c="dimmed"
 						>
-							Scope:{' '}
-							{eligibleRole.schedule.expandedProperties?.scope?.displayName ??
-								eligibleRole.schedule.scope ??
-								'Unknown Scope'}
+							Scope: {eligibleRole.schedule.scopeDisplayName ?? eligibleRole.schedule.scope ?? 'Unknown Scope'}
 						</Text>
 					</Group>
 
