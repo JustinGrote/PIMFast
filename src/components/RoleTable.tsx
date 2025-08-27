@@ -3,13 +3,13 @@ import { getMilliseconds } from '@/api/time'
 import { throwIfNotError } from '@/api/util'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { armScheduleToCommon, graphScheduleToCommon } from '@/model/CommonRoleSchedule'
+import { armScheduleToCommon, graphScheduleToCommon, groupScheduleToCommon } from '@/model/CommonRoleSchedule'
 import { EligibleRole } from '@/model/EligibleRole'
 import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
+import { IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch, IconUsers } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import dayjs from 'dayjs'
@@ -24,7 +24,10 @@ import {
 	getMyRoleAssignmentScheduleInstances,
 	getMyRoleEligibilityScheduleInstances,
 } from '../api/pim'
-import { getMyEntraRoleEligibilityScheduleInstances } from '../api/pimGraph'
+import {
+	getMyEntraGroupEligibilityScheduleInstances,
+	getMyEntraRoleEligibilityScheduleInstances,
+} from '../api/pimGraph'
 import ResolvedTenantName from './ResolvedTenantName'
 import './RoleTable.css'
 
@@ -98,7 +101,23 @@ function RoleTable() {
 					}
 				} catch (error) {
 					console.warn('Failed to fetch Entra ID roles for account:', account.name, error)
-					// Continue with ARM roles even if Graph roles fail
+					// Continue with other role types even if Graph roles fail
+				}
+
+				// Fetch Graph-based Group roles (PIM for Groups)
+				try {
+					const groupScheduleInstances = await getMyEntraGroupEligibilityScheduleInstances(account)
+					for (const schedule of groupScheduleInstances) {
+						const commonSchedule = groupScheduleToCommon(schedule)
+						allEligibleRoles.push({
+							account,
+							schedule: commonSchedule,
+							id: `${account.homeAccountId}-group-${commonSchedule.id}`,
+						})
+					}
+				} catch (error) {
+					console.warn('Failed to fetch Group roles for account:', account.name, error)
+					// Continue with other role types even if Group roles fail
 				}
 			}
 
@@ -345,6 +364,7 @@ function RoleTable() {
 										.with('subscription', () => <Subscriptions />)
 										.with('managementgroup', () => <ManagementGroups />)
 										.with('directory', () => <AzureResource />)
+										.with('group', () => <IconUsers size={16} />)
 										.otherwise(() => <AzureResource />)
 									const displayName = schedule.scopeDisplayName ?? 'unknown'
 									const portalUrl = schedule.scope ? getAzurePortalUrl(schedule.scope, schedule.scopeType) : '#'
@@ -413,7 +433,13 @@ function RoleTable() {
 														<IconClick
 															size="sm"
 															color="gray"
-															title="Graph-based role activation not yet supported"
+															title={
+																eligibleRole.schedule.sourceType === 'graph'
+																	? 'Entra ID role activation not yet supported'
+																	: eligibleRole.schedule.sourceType === 'group'
+																		? 'Group role activation not yet supported'
+																		: 'Role activation not supported'
+															}
 														/>
 													) : isEligibleRoleActivated(eligibleRole) ? (
 														<IconPlayerStop

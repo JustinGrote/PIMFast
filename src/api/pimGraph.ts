@@ -1,4 +1,5 @@
-import { AccountInfo } from '@azure/msal-browser';
+import { PrivilegedAccessGroupEligibilityScheduleInstanceExpanded } from '@/model/CommonRoleSchedule'
+import { AccountInfo } from '@azure/msal-browser'
 import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure'
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary'
 import { AccountInfoHomeId, AccountInfoTokenCredential, scopesGraphAndAzure } from './auth'
@@ -67,6 +68,29 @@ export async function getMyEntraRoleEligibilityScheduleInstances(
 		return (response?.value as UnifiedRoleEligibilityScheduleInstanceExpanded[]) ?? []
 	} catch (error) {
 		console.error('Error fetching role eligibility schedule instances:', error)
+		throw error
+	}
+}
+
+export async function getMyEntraGroupEligibilityScheduleInstances(
+	account: AccountInfo,
+): Promise<PrivilegedAccessGroupEligibilityScheduleInstanceExpanded[]> {
+	try {
+		const client = await getPimClient(account)
+
+		const request =
+			client.identityGovernance.privilegedAccess.group.eligibilityScheduleInstances.filterByCurrentUserWithOn(
+				'principal',
+			)
+		const response = await request.get({
+			queryParameters: {
+				expand: ['group', 'principal'],
+			},
+		})
+
+		return (response?.value as PrivilegedAccessGroupEligibilityScheduleInstanceExpanded[]) ?? []
+	} catch (error) {
+		console.error('Error fetching group eligibility schedule instances:', error)
 		throw error
 	}
 }

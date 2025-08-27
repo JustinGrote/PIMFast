@@ -30,6 +30,7 @@ export const scopesGraphAndAzure = [
 	'https://management.azure.com/user_impersonation',
 	'User.Read',
 	'CrossTenantInformation.ReadBasic.All',
+	'PrivilegedEligibilitySchedule.ReadWrite.AzureADGroup',
 ]
 
 const PIMFAST_EXTENSION_ID = 'onokobaobjenkhjaopaglhmiegkchflp'

@@ -130,9 +130,10 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 			roleDefinitionId: armSchedule.roleDefinitionId,
 		})
 	} else {
-		// For Graph-based schedules, we need to implement the Graph API deactivation
-		// This would require using the Graph PIM client instead
-		throw new Error('Graph-based role deactivation is not yet implemented')
+		// For Graph-based and Group-based schedules, we need to implement the respective API deactivation
+		const roleType =
+			schedule.sourceType === 'graph' ? 'Entra ID' : schedule.sourceType === 'group' ? 'Group' : 'Non-ARM'
+		throw new Error(`${roleType} role deactivation is not yet implemented`)
 	}
 }
 
@@ -154,9 +155,10 @@ export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
 			}
 		}
 	} else {
-		// For Graph-based schedules, we need to implement the Graph API assignment lookup
-		// This would require using the Graph PIM client instead
-		throw new Error('Graph-based role assignment lookup is not yet implemented')
+		// For Graph-based and Group-based schedules, we need to implement the respective API assignment lookup
+		const roleType =
+			schedule.sourceType === 'graph' ? 'Entra ID' : schedule.sourceType === 'group' ? 'Group' : 'Non-ARM'
+		throw new Error(`${roleType} role assignment lookup is not yet implemented`)
 	}
 }
 

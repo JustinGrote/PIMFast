@@ -1,5 +1,24 @@
+import {
+	DirectoryObject,
+	Group,
+	PrivilegedAccessGroupEligibilityScheduleInstance,
+} from '@/api/generated/msgraph/models'
 import { UnifiedRoleEligibilityScheduleInstanceExpanded } from '@/api/pimGraph'
 import { RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
+
+/**
+ * Expanded interface for PrivilegedAccessGroupEligibilityScheduleInstance with populated group and principal
+ */
+export interface PrivilegedAccessGroupEligibilityScheduleInstanceExpanded
+	extends PrivilegedAccessGroupEligibilityScheduleInstance {
+	group: Group & {
+		displayName?: string
+		description?: string
+	}
+	principal: DirectoryObject & {
+		displayName?: string
+	}
+}
 
 /**
  * Common interface for role schedule instances that abstracts the differences
@@ -9,6 +28,7 @@ import { RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
  * This enables displaying:
  * - Azure Resource roles (ARM API) - Can be activated/deactivated
  * - Entra ID directory roles (Graph API) - Display only for now
+ * - Group roles (Graph API PIM for Groups) - Display only for now
  */
 export interface CommonRoleSchedule {
 	/** Unique identifier for the role schedule instance */
@@ -32,9 +52,12 @@ export interface CommonRoleSchedule {
 	/** End date of the eligibility */
 	endDateTime?: Date
 	/** Original schedule instance for activation purposes */
-	originalSchedule: RoleEligibilityScheduleInstance | UnifiedRoleEligibilityScheduleInstanceExpanded
+	originalSchedule:
+		| RoleEligibilityScheduleInstance
+		| UnifiedRoleEligibilityScheduleInstanceExpanded
+		| PrivilegedAccessGroupEligibilityScheduleInstanceExpanded
 	/** Source API type for debugging and specific operations */
-	sourceType: 'arm' | 'graph'
+	sourceType: 'arm' | 'graph' | 'group'
 }
 
 /**
@@ -74,5 +97,31 @@ export function graphScheduleToCommon(schedule: UnifiedRoleEligibilityScheduleIn
 		endDateTime: schedule.endDateTime ? new Date(schedule.endDateTime) : undefined,
 		originalSchedule: schedule,
 		sourceType: 'graph',
+	}
+}
+
+/**
+ * Converts a Microsoft Graph PrivilegedAccessGroupEligibilityScheduleInstanceExpanded to the common interface.
+ */
+export function groupScheduleToCommon(
+	schedule: PrivilegedAccessGroupEligibilityScheduleInstanceExpanded,
+): CommonRoleSchedule {
+	// Access ID determines the role type (owner or member)
+	const roleDisplayName = schedule.accessId === 'owner' ? 'Owner' : 'Member'
+	const groupDisplayName = schedule.group?.displayName ?? 'Unknown Group'
+
+	return {
+		id: schedule.id ?? '',
+		scope: schedule.groupId ?? '',
+		roleDefinitionId: schedule.accessId ?? '',
+		roleDefinitionDisplayName: `${roleDisplayName} of ${groupDisplayName}`,
+		scopeDisplayName: groupDisplayName,
+		scopeType: 'group',
+		principalId: schedule.principalId ?? '',
+		principalDisplayName: schedule.principal?.displayName,
+		startDateTime: schedule.startDateTime ? new Date(schedule.startDateTime) : undefined,
+		endDateTime: schedule.endDateTime ? new Date(schedule.endDateTime) : undefined,
+		originalSchedule: schedule,
+		sourceType: 'group',
 	}
 }
