@@ -3,7 +3,7 @@ import { AllCommunityModule, colorSchemeDark, colorSchemeLight, ModuleRegistry, 
 import { AgGridReact, AgGridReactProps } from 'ag-grid-react'
 import { useMemo } from 'react'
 
-
+import './MantineAgGridReact.css'
 
 // Register all Community features
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -24,9 +24,9 @@ export default function MantineAgGridReact({ ...agGridProps }: AgGridReactProps)
 	// Merge default styling with user props
 	const defaultGridOptions = useMemo(
 		() => ({
-			theme: gridTheme,
-			// Apply Mantine's primary color as the selection color
 			...agGridProps,
+			theme: gridTheme,
+			className: `mantineAgGrid ${agGridProps.className || ''}`.trim(),
 		}),
 		[agGridProps],
 	)

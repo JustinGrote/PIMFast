@@ -1,0 +1,7 @@
+/* Override AG Grid font sizes to match Mantine theme */
+.mantineAgGrid {
+	--ag-data-font-size: var(--mantine-font-size-md);
+	--ag-font-size: var(--mantine-font-size-md);
+	--ag-header-font-size: var(--mantine-font-size-lg);
+	--ag-text-color: var(--mantine-color-text);
+}
