@@ -1,6 +1,6 @@
 import { getAllAccounts, logout } from '@/api/auth'
 import { AccountInfo } from '@azure/msal-browser'
-import { ActionIcon, Group, Tooltip } from '@mantine/core'
+import { ActionIcon, Group, LoadingOverlay, Tooltip } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconX } from '@tabler/icons-react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -92,7 +92,12 @@ export default function AccountTable() {
 	)
 
 	return (
-		<div style={{ height: '400px', width: '100%' }}>
+		<div style={{ height: '400px', width: '100%', position: 'relative' }}>
+			<LoadingOverlay
+				visible={isLoading}
+				zIndex={1000}
+				overlayProps={{ radius: 'sm', blur: 2 }}
+			/>
 			<MantineAgGridReact
 				rowData={accounts}
 				columnDefs={columnDefs}

@@ -7,7 +7,7 @@ import { armScheduleToCommon, graphScheduleToCommon, groupScheduleToCommon } fro
 import { EligibleRole } from '@/model/EligibleRole'
 import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
-import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
+import { ActionIcon, Button, Center, Group, LoadingOverlay, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -479,7 +479,12 @@ function RoleTable() {
 						mb="md"
 					/>
 
-					<div style={{ height: '600px', width: '100%' }}>
+					<div style={{ height: '600px', width: '100%', position: 'relative' }}>
+						<LoadingOverlay
+							visible={eligibleRolesQuery.isLoading || eligibleRolesQuery.isFetching}
+							zIndex={1000}
+							overlayProps={{ radius: 'sm', blur: 2 }}
+						/>
 						<MantineAgGridReact
 							className="roleTable"
 							rowData={filteredRoles}
