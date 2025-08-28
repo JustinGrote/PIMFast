@@ -9,21 +9,13 @@ import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authoriz
 import { AccountInfo } from '@azure/msal-browser'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import {
-	IconClearAll,
-	IconClick,
-	IconPlayerPlay,
-	IconPlayerStop,
-	IconRefresh,
-	IconSearch,
-	IconUsers,
-} from '@tabler/icons-react'
+import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
+import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
+import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { DataTable, DataTableSortStatus, useDataTableColumns } from 'mantine-datatable'
 import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import { getAllAccounts } from '../api/auth'
@@ -37,6 +29,7 @@ import {
 	getMyEntraRoleEligibilityScheduleInstances,
 } from '../api/pimGraph'
 import ExpiresCountdown from './ExpiresCountdown'
+import MantineAgGridReact from './MantineAgGridReact'
 import ResolvedTenantName from './ResolvedTenantName'
 import './RoleTable.css'
 
@@ -48,165 +41,7 @@ dayjs.extend(relativeTimePlugin)
 function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
 	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
-	const [sortStatus, setSortStatus] = useState<DataTableSortStatus<EligibleRole>>({
-		columnAccessor: 'account',
-		direction: 'asc',
-	})
-	const storeColumnsKey = 'eligibleRoles'
-	const { effectiveColumns, resetColumnsOrder } = useDataTableColumns<EligibleRole>({
-		key: storeColumnsKey,
-		columns: [
-			{
-				accessor: 'roleDefinition',
-				title: 'Role',
-				resizable: true,
-				sortable: true,
-				render: eligibleRole => (
-					<div>
-						<span title={eligibleRole.schedule.roleDefinitionId || ''}>
-							{eligibleRole.schedule.roleDefinitionDisplayName ?? 'unknown'}
-						</span>
-					</div>
-				),
-			},
-			{
-				accessor: 'scope',
-				title: 'Scope',
-				resizable: true,
-				sortable: true,
-				render: ({ schedule }) => {
-					const icon = match(schedule.scopeType)
-						.with('resourcegroup', () => <ResourceGroups />)
-						.with('subscription', () => <Subscriptions />)
-						.with('managementgroup', () => <ManagementGroups />)
-						.with('directory', () => <AzureResource />)
-						.with('group', () => <IconUsers size={16} />)
-						.otherwise(() => <AzureResource />)
-					const displayName = schedule.scopeDisplayName ?? 'unknown'
-					const portalUrl = schedule.scope ? getAzurePortalUrl(schedule.scope, schedule.scopeType) : '#'
-
-					return (
-						<Group
-							gap="xs"
-							wrap="nowrap"
-							style={{ minWidth: 0, flex: 1 }}
-						>
-							{icon}
-							<a
-								href={portalUrl}
-								target="_blank"
-								rel="noopener noreferrer"
-								title={schedule.scope ?? ''}
-								style={{
-									textDecoration: 'none',
-									color: 'inherit',
-									overflow: 'hidden',
-									textOverflow: 'ellipsis',
-									whiteSpace: 'nowrap',
-									minWidth: 0,
-									flex: 1,
-								}}
-							>
-								{displayName}
-							</a>
-						</Group>
-					)
-				},
-			},
-			{
-				title: 'Expires',
-				accessor: 'expires',
-				resizable: true,
-				sortable: false,
-				render: eligibleRole => {
-					return eligibleRole.schedule.endDateTime ? (
-						<ExpiresCountdown futureDate={eligibleRole.schedule.endDateTime} />
-					) : (
-						<span title="No expiration">Permanent</span>
-					)
-				},
-			},
-			{
-				accessor: 'account',
-				title: 'Account',
-				sortable: true,
-				resizable: true,
-				render: eligibleRole => <span title={eligibleRole.account.username}>{eligibleRole.account.name}</span>,
-			},
-			{
-				accessor: 'tenant',
-				title: 'Tenant',
-				resizable: true,
-				sortable: false, //TODO: Reimplement
-				render: eligibleRole => {
-					return (
-						<ResolvedTenantName
-							account={eligibleRole.account}
-							roleOrTenantId={eligibleRole}
-						/>
-					)
-				},
-			},
-			{
-				accessor: 'actions',
-				title: (
-					<Center>
-						<IconClick size={16} />
-					</Center>
-				),
-				resizable: false,
-				render: eligibleRole => (
-					<div className="one-line-row">
-						<Group>
-							<ActionIcon
-								size="sm"
-								variant="subtle"
-								disabled={!canActivateRole(eligibleRole) || isEligibleRoleNewlyActivated(eligibleRole)}
-								onClick={() => {
-									handleActivateClick(eligibleRole)
-								}}
-								loaderProps={{
-									color: 'blue',
-								}}
-							>
-								<Skeleton visible={!roleStatusQuery.isSuccess}>
-									{!canActivateRole(eligibleRole) ? (
-										<IconClick
-											size="sm"
-											color="gray"
-											title={
-												eligibleRole.schedule.sourceType === 'graph'
-													? 'Entra ID role activation not yet supported'
-													: eligibleRole.schedule.sourceType === 'group'
-														? 'Group role activation not yet supported'
-														: 'Role activation not supported'
-											}
-										/>
-									) : isEligibleRoleActivated(eligibleRole) ? (
-										<IconPlayerStop
-											size="sm"
-											color={isEligibleRoleNewlyActivated(eligibleRole) ? undefined : 'red'}
-											title={
-												isEligibleRoleNewlyActivated(eligibleRole)
-													? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
-													: 'Deactivate Role'
-											}
-										/>
-									) : (
-										<IconPlayerPlay
-											size="sm"
-											color="green"
-											title="Activate Role"
-										/>
-									)}
-								</Skeleton>
-							</ActionIcon>
-						</Group>
-					</div>
-				),
-			},
-		],
-	})
+	const [gridApi, setGridApi] = useState<GridApi<EligibleRole> | null>(null)
 
 	const queryClient = useQueryClient()
 	const [filterQuery, setFilterQuery] = useState('')
@@ -346,6 +181,171 @@ function RoleTable() {
 		},
 	})
 
+	const columnDefs: ColDef<EligibleRole>[] = useMemo(
+		() => [
+			{
+				field: 'schedule.roleDefinitionDisplayName',
+				headerName: 'Role',
+				cellRenderer: (params: { data: EligibleRole }) => (
+					<div>
+						<span title={params.data.schedule.roleDefinitionId || ''}>
+							{params.data.schedule.roleDefinitionDisplayName ?? 'unknown'}
+						</span>
+					</div>
+				),
+				flex: 2,
+				sortable: true,
+				resizable: true,
+			},
+			{
+				headerName: 'Scope',
+				cellRenderer: (params: { data: EligibleRole }) => {
+					const { schedule } = params.data
+					const icon = match(schedule.scopeType)
+						.with('resourcegroup', () => <ResourceGroups />)
+						.with('subscription', () => <Subscriptions />)
+						.with('managementgroup', () => <ManagementGroups />)
+						.with('directory', () => <EntraConnect />)
+						.with('group', () => <Groups />)
+						.otherwise(() => <AzureResource />)
+					const displayName = schedule.scopeDisplayName ?? 'unknown'
+					const portalUrl = schedule.scope ? getAzurePortalUrl(schedule.scope, schedule.scopeType) : '#'
+
+					return (
+						<Group
+							gap="xs"
+							wrap="nowrap"
+							style={{ minWidth: 0, flex: 1 }}
+						>
+							{icon}
+							<a
+								href={portalUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								title={schedule.scope ?? ''}
+								style={{
+									textDecoration: 'none',
+									color: 'inherit',
+									overflow: 'hidden',
+									textOverflow: 'ellipsis',
+									whiteSpace: 'nowrap',
+									minWidth: 0,
+									flex: 1,
+								}}
+							>
+								{displayName}
+							</a>
+						</Group>
+					)
+				},
+				flex: 2,
+				sortable: true,
+				resizable: true,
+				valueGetter: params => params.data?.schedule.scopeDisplayName || '',
+			},
+			{
+				headerName: 'Expires',
+				cellRenderer: (params: { data: EligibleRole }) => {
+					return params.data.schedule.endDateTime ? (
+						<ExpiresCountdown futureDate={params.data.schedule.endDateTime} />
+					) : (
+						<span title="No expiration">Permanent</span>
+					)
+				},
+				flex: 1,
+				sortable: false,
+				resizable: true,
+				valueGetter: params => params.data?.schedule.endDateTime || '',
+			},
+			{
+				field: 'account.name',
+				headerName: 'Account',
+				cellRenderer: (params: { data: EligibleRole }) => (
+					<span title={params.data.account.username}>{params.data.account.name}</span>
+				),
+				flex: 1,
+				sortable: true,
+				resizable: true,
+			},
+			{
+				headerName: 'Tenant',
+				cellRenderer: (params: { data: EligibleRole }) => {
+					return (
+						<ResolvedTenantName
+							account={params.data.account}
+							roleOrTenantId={params.data}
+						/>
+					)
+				},
+				flex: 1,
+				sortable: false,
+				resizable: true,
+			},
+			{
+				headerName: '',
+				headerComponent: () => (
+					<Center>
+						<IconClick size={16} />
+					</Center>
+				),
+				cellRenderer: (params: { data: EligibleRole }) => (
+					<div className="one-line-row">
+						<Group>
+							<ActionIcon
+								size="sm"
+								variant="subtle"
+								disabled={!canActivateRole(params.data) || isEligibleRoleNewlyActivated(params.data)}
+								onClick={() => {
+									handleActivateClick(params.data)
+								}}
+								loaderProps={{
+									color: 'blue',
+								}}
+							>
+								<Skeleton visible={!roleStatusQuery.isSuccess}>
+									{!canActivateRole(params.data) ? (
+										<IconClick
+											size="sm"
+											color="gray"
+											title={
+												params.data.schedule.sourceType === 'graph'
+													? 'Entra ID role activation not yet supported'
+													: params.data.schedule.sourceType === 'group'
+														? 'Group role activation not yet supported'
+														: 'Role activation not supported'
+											}
+										/>
+									) : isEligibleRoleActivated(params.data) ? (
+										<IconPlayerStop
+											size="sm"
+											color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
+											title={
+												isEligibleRoleNewlyActivated(params.data)
+													? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
+													: 'Deactivate Role'
+											}
+										/>
+									) : (
+										<IconPlayerPlay
+											size="sm"
+											color="green"
+											title="Activate Role"
+										/>
+									)}
+								</Skeleton>
+							</ActionIcon>
+						</Group>
+					</div>
+				),
+				width: 80,
+				pinned: 'right',
+				sortable: false,
+				resizable: false,
+			},
+		],
+		[roleStatusQuery.isSuccess],
+	)
+
 	async function refresh() {
 		await queryClient.invalidateQueries({ queryKey: ['pim'] })
 	}
@@ -388,8 +388,8 @@ function RoleTable() {
 		}
 	}
 
-	// Filter and sort the eligible roles
-	const filteredAndSortedRoles = useMemo(() => {
+	// Filter the eligible roles based on search query
+	const filteredRoles = useMemo(() => {
 		let filtered: EligibleRole[] = eligibleRolesQuery.data ?? []
 
 		// Apply search filter
@@ -408,40 +408,34 @@ function RoleTable() {
 			})
 		}
 
-		// Apply sorting
-		if (sortStatus.columnAccessor) {
-			filtered.sort((a, b) => {
-				let aValue: string = ''
-				let bValue: string = ''
-
-				switch (sortStatus.columnAccessor) {
-					case 'account':
-						aValue = a.account.name || ''
-						bValue = b.account.name || ''
-						break
-					case 'roleDefinition':
-						aValue = a.schedule.roleDefinitionDisplayName || ''
-						bValue = b.schedule.roleDefinitionDisplayName || ''
-						break
-					case 'scope':
-						aValue = a.schedule.scopeDisplayName || ''
-						bValue = b.schedule.scopeDisplayName || ''
-						break
-					// case 'tenant':
-					// 	aValue = tenantNameMap.get(a.id) || ''
-					// 	bValue = tenantNameMap.get(b.id) || ''
-					// 	break
-					default:
-						return 0
-				}
-
-				const comparison = aValue.localeCompare(bValue)
-				return sortStatus.direction === 'desc' ? -comparison : comparison
-			})
-		}
-
 		return filtered
-	}, [filterQuery, sortStatus, eligibleRolesQuery.data])
+	}, [filterQuery, eligibleRolesQuery.data])
+
+	const onGridReady = (params: GridReadyEvent<EligibleRole>) => {
+		setGridApi(params.api)
+	}
+
+	const getRowStyle = (params: { data: EligibleRole }) => {
+		if (!currentTab?.url || !params.data) {
+			return undefined
+		}
+		try {
+			const resourceUri = getResourceIdFromPortalUrl(currentTab.url)
+			if (resourceUri.startsWith(params.data.schedule.scope!)) {
+				return { backgroundColor: 'var(--mantine-color-gray-7)' }
+			}
+		} catch (error: unknown) {
+			throwIfNotError(error)
+			console.debug(`Failed to find resource ID in ${currentTab.url}: ${error.message}`)
+		}
+		return undefined
+	}
+
+	const resetColumnsOrder = () => {
+		if (gridApi) {
+			gridApi.resetColumnState()
+		}
+	}
 
 	return (
 		<>
@@ -462,19 +456,17 @@ function RoleTable() {
 								variant="subtle"
 								color="green"
 								size="compact-xs"
-								styles={{ root: { height: '1.5rem', minHeight: 'unset', padding: '0 0.3rem' } }}
 								onClick={refresh}
 							>
-								<IconRefresh size="0.9rem" />
+								<IconRefresh />
 							</Button>
 							<Button
 								variant="subtle"
 								color="gray"
 								size="compact-xs"
-								styles={{ root: { height: '1.5rem', minHeight: 'unset', padding: '0 0.3rem' } }}
 								onClick={resetColumnsOrder}
 							>
-								<IconClearAll size="0.9rem" />
+								<IconClearAll />
 							</Button>
 						</Group>
 					</Group>
@@ -487,39 +479,25 @@ function RoleTable() {
 						mb="md"
 					/>
 
-					<DataTable<EligibleRole>
-						className="roleTable"
-						withTableBorder
-						borderRadius="xs"
-						withColumnBorders
-						striped
-						fetching={eligibleRolesQuery.isFetching}
-						highlightOnHover
-						pinLastColumn
-						sortStatus={sortStatus}
-						onSortStatusChange={setSortStatus}
-						rowColor={({ schedule }) => {
-							if (!currentTab?.url) {
-								return undefined
-							}
-							try {
-								const resourceUri = getResourceIdFromPortalUrl(currentTab.url)
-								if (resourceUri.startsWith(schedule.scope!)) {
-									return 'green'
-								}
-							} catch (error: unknown) {
-								throwIfNotError(error)
-								console.debug(`Failed to find resource ID in ${currentTab.url}: ${error.message}`)
-							}
-							return undefined
-						}}
-						// TODO: Add multiple activation support
-						// selectedRecords={selectedSchedules}
-						// onSelectedRecordsChange={setSelectedSchedules}
-						records={filteredAndSortedRoles}
-						storeColumnsKey={storeColumnsKey}
-						columns={effectiveColumns}
-					/>
+					<div style={{ height: '600px', width: '100%' }}>
+						<MantineAgGridReact
+							className="roleTable"
+							rowData={filteredRoles}
+							columnDefs={columnDefs}
+							loading={eligibleRolesQuery.isFetching}
+							getRowId={params => params.data.id}
+							onGridReady={onGridReady}
+							getRowStyle={getRowStyle}
+							domLayout="normal"
+							suppressHorizontalScroll={false}
+							rowSelection="single"
+							defaultColDef={{
+								sortable: true,
+								filter: true,
+								resizable: true,
+							}}
+						/>
+					</div>
 				</Stack>
 			</Paper>
 

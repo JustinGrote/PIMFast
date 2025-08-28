@@ -36,6 +36,8 @@
     "@tanstack/react-query": "^5.85.3",
     "@tanstack/react-query-devtools": "^5.85.3",
     "@threeveloper/azure-react-icons": "^1.1.1",
+    "ag-grid-community": "^34.1.2",
+    "ag-grid-react": "^34.1.2",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.13",
     "humanize-duration": "^3.33.0",

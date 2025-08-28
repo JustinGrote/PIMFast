@@ -201,7 +201,7 @@ export const client = new PublicClientApplication({
 			loggerCallback: (level, message) => {
 				console.log(`[MSAL] ${level}: ${message}`)
 			},
-			logLevel: LogLevel.Trace,
+			logLevel: LogLevel.Info,
 			piiLoggingEnabled: true,
 		},
 		// allowNativeBroker: true,

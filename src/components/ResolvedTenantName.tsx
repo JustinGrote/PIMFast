@@ -5,25 +5,27 @@ import {
 	ResourceGroupId,
 	ResourceId,
 	SubscriptionId,
+	TenantId,
 } from '@/api/azureResourceId'
 import { fetchManagementGroup } from '@/api/managementGroups'
 import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
+import { EligibleRole } from '@/model/EligibleRole'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { match, P } from 'ts-pattern'
-import { EligibleRole } from './RoleTable'
 
 /**
  * Renders the resolved tenant display name for a given eligible role id.
  */
 export default function ResolvedTenantName({
 	account,
-	roleOrTenantId,
+	// The ID of the role or tenant. If unspecified, it will be derived from the AccountInfo
+	roleOrTenantId = account.tenantId,
 }: {
 	account: AccountInfo
-	roleOrTenantId: EligibleRole | string
+	roleOrTenantId?: EligibleRole | string
 }) {
 	const { data: tenants } = useQuery<TenantIdDescription[]>({
 		queryKey: ['tenants', account.homeAccountId],
@@ -98,7 +100,15 @@ export class FetchTenantSubscriptionNotFoundError extends Error {
 }
 
 async function fetchTenantIdFromResourceId(account: AccountInfo, resourceId: string) {
+	if (resourceId === '/' || resourceId.startsWith('/administrativeUnits/')) {
+		return account.tenantId
+	}
+
 	const parsedResourceId = parseResourceId(resourceId)
+	if (parsedResourceId instanceof TenantId) {
+		// Maybefixme?: Use tenant profiles?
+		return account.tenantId
+	}
 	if (parsedResourceId instanceof ManagementGroupId) {
 		const managementGroupInfo = await fetchManagementGroup(account, parsedResourceId.id)
 		return managementGroupInfo.tenantId
@@ -110,9 +120,7 @@ async function fetchTenantIdFromResourceId(account: AccountInfo, resourceId: str
 		.with(P.instanceOf(ResourceId), ({ subscription }) => subscription)
 		.with(P.instanceOf(ResourceGroupId), ({ subscription }) => subscription)
 		.with(P.instanceOf(SubscriptionId), ({ id }) => id)
-		.otherwise(r => {
-			return undefined
-		})
+		.otherwise(() => undefined)
 
 	if (!subscriptionId) throw new Error('Failed to parse subscription ID from schedule scope')
 
