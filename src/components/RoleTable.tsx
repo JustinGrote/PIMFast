@@ -43,7 +43,6 @@ import {
 import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
 import ResolvedTenantName from './ResolvedTenantName'
-import './RoleTable.css'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -272,8 +271,9 @@ function RoleTable() {
 			{
 				field: 'account.name',
 				headerName: 'Account',
+				hide: accountsQuery.data && accountsQuery.data.length <= 1,
 				cellRenderer: (params: { data: EligibleRole }) => (
-					<span title={params.data.account.username}>{params.data.account.name}</span>
+					<span title={params.data.account.name}>{params.data.account.username}</span>
 				),
 				flex: 1,
 				sortable: true,
@@ -285,7 +285,11 @@ function RoleTable() {
 					return (
 						<ResolvedTenantName
 							account={params.data.account}
-							roleOrTenantId={params.data}
+							roleOrTenantId={
+								['group', 'graph'].includes(params.data.schedule.sourceType)
+									? params.data.account.tenantId
+									: params.data
+							}
 						/>
 					)
 				},
