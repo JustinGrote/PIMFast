@@ -1,6 +1,6 @@
 .expires-countdown {
 	pointer-events: none;
-	border-radius: var(--mantine-radius-md);
+	border-radius: var(--mantine-radius-sm);
 	background: rgba(var(--mantine-color-gray-7-rgb), 0.5);
 	text-align: center; /* Mantine's text-center utility */
 	font-size: var(--mantine-font-size-sm); /* Mantine small text size */

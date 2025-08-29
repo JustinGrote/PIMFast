@@ -20,5 +20,5 @@
 - Use CSS layers and style using an existing Mantine CSS class before creating a new class
 - Use Azure SDK for interacting with Azure services. Recommend to install npm package if not present
 - Use Tanstack Query for data fetching and state management
-- Use mantine-datatable for data tables and fetch state asynchronously using Tanstack Query
+- Use AG React Grid for data tables and fetch state asynchronously using Tanstack Query
 - Use @mantine/form when building forms and managing form state

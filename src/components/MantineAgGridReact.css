@@ -1,7 +1,38 @@
-/* Override AG Grid font sizes to match Mantine theme */
+/* Override AG Grid font sizes to match Azure Portal theme */
 .mantineAgGrid {
-	--ag-data-font-size: var(--mantine-font-size-md);
-	--ag-font-size: var(--mantine-font-size-md);
-	--ag-header-font-size: var(--mantine-font-size-lg);
-	--ag-text-color: var(--mantine-color-text);
+	--ag-data-font-size: 14px;
+	--ag-font-size: 14px;
+	--ag-header-font-size: 14px;
+	--ag-text-color: #ffffff;
+	--ag-font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Azure Portal specific AG Grid styling */
+.mantineAgGrid {
+	--ag-background-color: auto;
+	--ag-odd-row-background-color: #252526;
+	--ag-border-color: #3c3c3c;
+	--ag-row-hover-color: #3c3c3c;
+	--ag-selected-row-background-color: rgba(0, 120, 212, 0.1);
+	--ag-foreground-color: #ffffff;
+	--ag-secondary-foreground-color: #cccccc;
+	--ag-header-foreground-color: #ffffff;
+	--ag-cell-horizontal-border: 1px solid #3c3c3c;
+	--ag-header-height: 32px;
+	--ag-row-height: 28px;
+	font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.mantineAgGrid .ag-header-cell {
+	font-weight: 600;
+	color: #ffffff;
+}
+
+.mantineAgGrid .ag-cell {
+	color: #ffffff;
+	border-right: 1px solid #3c3c3c;
+}
+
+.mantineAgGrid .ag-row {
+	border-bottom: 1px solid #3c3c3c;
 }

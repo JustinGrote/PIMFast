@@ -1,4 +1,3 @@
-import { Container, Stack } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -18,11 +17,7 @@ export default function App() {
 	return (
 		<ErrorBoundary>
 			<QueryClientProvider client={queryClient}>
-				<Container py="md">
-					<Stack>
-						<RoleTable />
-					</Stack>
-				</Container>
+				<RoleTable />
 				<ReactQueryDevtools initialIsOpen={false} />
 			</QueryClientProvider>
 		</ErrorBoundary>

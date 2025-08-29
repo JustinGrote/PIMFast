@@ -1,0 +1,144 @@
+/* Azure Portal-inspired styles */
+@layer components {
+	.azure-portal-shell {
+		background: #1e1e1e;
+		min-height: 100vh;
+		font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+	}
+
+	.azure-portal-header {
+		background: linear-gradient(90deg, #0078d4 0%, #106ebe 100%);
+		border-bottom: 1px solid #3c3c3c;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+	}
+
+	.azure-portal-main {
+		background: #1e1e1e;
+		padding: 1.5rem;
+		color: #ffffff;
+	}
+
+	/* Override Mantine Paper component to match Azure Portal cards */
+	.azure-portal-main .mantine-Paper-root {
+		background: #2d2d30;
+		border: 1px solid #3c3c3c;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+		border-radius: 4px;
+		color: #ffffff;
+	}
+
+	/* Azure Portal-style section headers */
+	.azure-portal-main .mantine-Title-root {
+		color: #ffffff;
+		font-weight: 600;
+		font-size: 1.125rem;
+	}
+
+	/* Azure Portal-style buttons */
+	.azure-portal-main .mantine-Button-root[data-variant="filled"] {
+		background: #0078d4;
+		border: 1px solid #0078d4;
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.azure-portal-main .mantine-Button-root[data-variant="filled"]:hover {
+		background: #106ebe;
+		border-color: #106ebe;
+	}
+
+	.azure-portal-main .mantine-Button-root[data-variant="subtle"] {
+		background: transparent;
+		color: #cccccc;
+		border: 1px solid transparent;
+	}
+
+	.azure-portal-main .mantine-Button-root[data-variant="subtle"]:hover {
+		background: #3c3c3c;
+		color: #ffffff;
+	}
+
+	/* Azure Portal-style text inputs */
+	.azure-portal-main .mantine-TextInput-input {
+		background: #252526;
+		border: 1px solid #3c3c3c;
+		color: #ffffff;
+		font-family: "Segoe UI", system-ui, sans-serif;
+	}
+
+	.azure-portal-main .mantine-TextInput-input:focus {
+		border-color: #0078d4;
+		box-shadow: 0 0 0 1px #0078d4;
+	}
+
+	.azure-portal-main .mantine-TextInput-input::placeholder {
+		color: #969696;
+	}
+
+	/* Azure Portal-style action icons */
+	.azure-portal-main .mantine-ActionIcon-root {
+		background: transparent;
+		border: 1px solid #3c3c3c;
+		color: #cccccc;
+	}
+
+	.azure-portal-main .mantine-ActionIcon-root:hover {
+		background: #3c3c3c;
+		border-color: #5a5a5a;
+		color: #ffffff;
+	}
+
+	/* Azure Portal table styling enhancements */
+	.azure-portal-main .ag-theme-balham-dark {
+		--ag-header-background-color: #252526;
+		--ag-odd-row-background-color: #1e1e1e;
+		--ag-even-row-background-color: #252526;
+		--ag-border-color: #3c3c3c;
+		--ag-row-hover-color: #3c3c3c;
+		--ag-selected-row-background-color: rgba(0, 120, 212, 0.1);
+		--ag-font-family: "Segoe UI", system-ui, sans-serif;
+		--ag-font-size: 14px;
+		--ag-foreground-color: #ffffff;
+		--ag-secondary-foreground-color: #cccccc;
+		--ag-header-foreground-color: #ffffff;
+		border: 1px solid #3c3c3c;
+		border-radius: 4px;
+	}
+
+	/* Azure Portal loading overlay */
+	.azure-portal-main .mantine-LoadingOverlay-root {
+		background: rgba(30, 30, 30, 0.8);
+	}
+
+	/* Azure Portal modal styling */
+	.azure-portal-main .mantine-Modal-content {
+		background: #2d2d30;
+		border: 1px solid #3c3c3c;
+		color: #ffffff;
+	}
+
+	.azure-portal-main .mantine-Modal-header {
+		background: #252526;
+		border-bottom: 1px solid #3c3c3c;
+		color: #ffffff;
+	}
+
+	.azure-portal-main .mantine-Modal-title {
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	/* Azure Portal text colors */
+	.azure-portal-main .mantine-Text-root {
+		color: #cccccc;
+	}
+
+	.azure-portal-main .mantine-Text-root[data-c="dimmed"] {
+		color: #969696;
+	}
+
+	/* Azure Portal group spacing */
+	.azure-portal-main .mantine-Group-root {
+		color: #ffffff;
+	}
+}

@@ -1,3 +1,29 @@
+/* Azure Portal global styles */
+html, body {
+	margin: 0;
+	padding: 0;
+	background: #1e1e1e;
+	color: #ffffff;
+	font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+#root {
+	min-height: 100vh;
+	background: #1e1e1e;
+}
+
+/* Override default Mantine styles to match Azure Portal */
+:root {
+	--mantine-color-text: #ffffff;
+	--mantine-color-body: #1e1e1e;
+	--mantine-color-default: #2d2d30;
+	--mantine-color-default-hover: #3c3c3c;
+	--mantine-color-default-color: #ffffff;
+	--mantine-color-dimmed: #969696;
+}
+
 .mantine-Table-td {
 	padding-top: 0 !important;
 	padding-bottom: 0 !important;

@@ -17,6 +17,7 @@ import {
 	Paper,
 	Skeleton,
 	Stack,
+	Text,
 	TextInput,
 	Title,
 } from '@mantine/core'
@@ -343,7 +344,13 @@ function RoleTable() {
 					return params.data.schedule.endDateTime ? (
 						<ExpiresCountdown futureDate={params.data.schedule.endDateTime} />
 					) : (
-						<span title="No expiration">Permanent</span>
+						<Text
+							size="sm"
+							style={{ textAlign: 'center' }}
+							title="No expiration"
+						>
+							Permanent
+						</Text>
 					)
 				},
 				width: 100,
@@ -409,7 +416,7 @@ function RoleTable() {
 						</Group>
 					</div>
 				),
-				width: 80,
+				width: 35,
 				pinned: 'right',
 				sortable: false,
 				resizable: false,
@@ -513,21 +520,27 @@ function RoleTable() {
 		<>
 			<Paper
 				shadow="xs"
-				p="md"
-				mt="xl"
+				p="lg"
+				radius="md"
 			>
-				<Stack>
+				<Stack gap="md">
 					<Group
 						justify="space-between"
 						align="center"
 					>
-						<Title order={2}>Eligible Roles</Title>
-						<Group>
+						<Title
+							order={3}
+							c="white"
+							fw={600}
+						>
+							Eligible Roles
+						</Title>
+						<Group gap="xs">
 							<Button
 								disabled={eligibleRolesQuery.isFetching}
 								variant="subtle"
 								color="green"
-								size="compact-xs"
+								size="compact-sm"
 								onClick={refresh}
 							>
 								<IconRefresh />
@@ -535,7 +548,7 @@ function RoleTable() {
 							<Button
 								variant="subtle"
 								color="gray"
-								size="compact-xs"
+								size="compact-sm"
 								onClick={resetColumnsOrder}
 							>
 								<IconClearAll />
@@ -551,12 +564,12 @@ function RoleTable() {
 						mb="md"
 					/>
 
-					<div style={{ height: '600px', width: '100%', position: 'relative' }}>
+					<div style={{ height: 'calc(100vh - 200px)', width: '100%', position: 'relative', minHeight: '400px' }}>
 						<LoadingOverlay
 							visible={eligibleRolesQuery.isLoading || eligibleRolesQuery.isFetching}
 							zIndex={1000}
 							overlayProps={{ radius: 'sm', blur: 2 }}
-						/>
+						></LoadingOverlay>
 						<MantineAgGridReact
 							className="roleTable"
 							rowData={filteredRoles}
@@ -574,6 +587,7 @@ function RoleTable() {
 								resizable: true,
 							}}
 						/>
+						<LoadingOverlay />
 					</div>
 				</Stack>
 			</Paper>
