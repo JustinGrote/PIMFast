@@ -45,6 +45,7 @@ import { IconCheck } from '@tabler/icons-react'
 import { useMutation } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
+import { humanizer } from 'humanize-duration'
 import { useState } from 'react'
 
 dayjs.extend(durationPlugin)
@@ -226,7 +227,7 @@ export function RoleActivationForm({
 								mr="md"
 								key={form.key('durationMinutes')}
 								{...form.getInputProps('durationMinutes')}
-								label={value => dayjs.duration(value, 'minutes').humanize()}
+								label={value => humanizer({ round: true })(value * 60 * 1000)}
 							/>
 						</Stack>
 					</Stack>

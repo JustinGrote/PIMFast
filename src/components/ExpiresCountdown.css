@@ -1,0 +1,30 @@
+.expires-countdown {
+	pointer-events: none;
+	border-radius: var(--mantine-radius-md);
+	background: rgba(var(--mantine-color-gray-7-rgb), 0.5);
+	text-align: center; /* Mantine's text-center utility */
+	font-size: var(--mantine-font-size-sm); /* Mantine small text size */
+}
+
+.expires-countdown.active {
+	background: var(--mantine-color-blue-filled);
+	transition:
+		background 1s,
+		color 1s;
+}
+
+.expires-countdown.warning {
+	color: var(--mantine-color-yellow-text);
+	background: var(--mantine-color-yellow-filled);
+	transition:
+		background 1s,
+		color 1s;
+}
+
+.expires-countdown.critical {
+	color: var(--mantine-color-red-text);
+	background: var(--mantine-color-red-filled);
+	transition:
+		background 1s,
+		color 1s;
+}

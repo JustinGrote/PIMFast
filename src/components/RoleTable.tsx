@@ -54,6 +54,8 @@ function RoleTable() {
 	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
 	const [gridApi, setGridApi] = useState<GridApi<EligibleRole> | null>(null)
 
+	const refetchInterval = getMilliseconds(30, 'seconds')
+
 	const queryClient = useQueryClient()
 	const [filterQuery, setFilterQuery] = useState('')
 
@@ -77,62 +79,102 @@ function RoleTable() {
 		}
 	})
 
-	// TODO: Perform this in parallel
-	const eligibleRolesQuery = useQuery<EligibleRole[]>({
-		queryKey: ['pim', 'eligibleRoles', accountsQuery.data],
+	const armEligibleRolesQuery = useQuery<EligibleRole[]>({
+		queryKey: ['pim', 'armEligibleRoles', accountsQuery.data],
 		enabled: accountsQuery.isSuccess,
-		refetchInterval: getMilliseconds(10, 'seconds'),
+		refetchInterval,
 		throwOnError: true,
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
-			const allEligibleRoles: EligibleRole[] = []
+			const allArmEligibleRoles: EligibleRole[] = []
 
-			for (const account of accounts) {
-				// Fetch ARM-based Azure Resource roles
-				const armScheduleInstances = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(account))
-				for (const schedule of armScheduleInstances) {
-					const commonSchedule = armScheduleToCommon(schedule)
-					allEligibleRoles.push({
-						account,
-						schedule: commonSchedule,
-						id: `${account.homeAccountId}-arm-${commonSchedule.id}`,
-					})
-				}
+			await Promise.all(
+				accounts.map(async account => {
+					const armScheduleInstances = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(account))
+					for (const schedule of armScheduleInstances) {
+						const commonSchedule = armScheduleToCommon(schedule)
+						allArmEligibleRoles.push({
+							account,
+							schedule: commonSchedule,
+							id: `${account.homeAccountId}-arm-${commonSchedule.id}`,
+						})
+					}
+				}),
+			)
 
-				// Fetch Graph-based Entra ID roles
-				try {
-					const graphScheduleInstances = await getMyEntraRoleEligibilityScheduleInstances(account)
-					for (const schedule of graphScheduleInstances) {
+			return allArmEligibleRoles
+		},
+	})
+
+	const graphEligibleRolesQuery = useQuery<EligibleRole[]>({
+		queryKey: ['pim', 'graphEligibleRoles', accountsQuery.data],
+		enabled: accountsQuery.isSuccess,
+		refetchInterval,
+		throwOnError: true,
+		queryFn: async () => {
+			const accounts = accountsQuery.data ?? []
+			const allGraphEligibleRoles: EligibleRole[] = []
+
+			await Promise.all(
+				accounts.map(async account => {
+					const graphScheduleResult = await getMyEntraRoleEligibilityScheduleInstances(account)
+					for (const schedule of graphScheduleResult) {
 						const commonSchedule = graphScheduleToCommon(schedule)
-						allEligibleRoles.push({
+						allGraphEligibleRoles.push({
 							account,
 							schedule: commonSchedule,
 							id: `${account.homeAccountId}-graph-${commonSchedule.id}`,
 						})
 					}
-				} catch (error) {
-					console.warn('Failed to fetch Entra ID roles for account:', account.name, error)
-					// Continue with other role types even if Graph roles fail
-				}
+				}),
+			)
 
-				// Fetch Graph-based Group roles (PIM for Groups)
-				try {
-					const groupScheduleInstances = await getMyEntraGroupEligibilityScheduleInstances(account)
-					for (const schedule of groupScheduleInstances) {
+			return allGraphEligibleRoles
+		},
+	})
+
+	const groupEligibleRolesQuery = useQuery<EligibleRole[]>({
+		queryKey: ['pim', 'groupEligibleRoles', accountsQuery.data],
+		enabled: accountsQuery.isSuccess,
+		refetchInterval,
+		throwOnError: true,
+		queryFn: async () => {
+			const accounts = accountsQuery.data ?? []
+			const allGroupEligibleRoles: EligibleRole[] = []
+
+			await Promise.all(
+				accounts.map(async account => {
+					const groupScheduleResult = await getMyEntraGroupEligibilityScheduleInstances(account)
+					for (const schedule of groupScheduleResult) {
 						const commonSchedule = groupScheduleToCommon(schedule)
-						allEligibleRoles.push({
+						allGroupEligibleRoles.push({
 							account,
 							schedule: commonSchedule,
 							id: `${account.homeAccountId}-group-${commonSchedule.id}`,
 						})
 					}
-				} catch (error) {
-					console.warn('Failed to fetch Group roles for account:', account.name, error)
-					// Continue with other role types even if Group roles fail
-				}
-			}
+				}),
+			)
 
-			return allEligibleRoles
+			return allGroupEligibleRoles
+		},
+	})
+
+	const eligibleRolesQuery = useQuery<EligibleRole[]>({
+		queryKey: [
+			'pim',
+			'eligibleRoles',
+			armEligibleRolesQuery.data,
+			graphEligibleRolesQuery.data,
+			groupEligibleRolesQuery.data,
+		],
+		enabled: armEligibleRolesQuery.isSuccess && graphEligibleRolesQuery.isSuccess && groupEligibleRolesQuery.isSuccess,
+		throwOnError: true,
+		queryFn: async () => {
+			const armRoles = armEligibleRolesQuery.data ?? []
+			const graphRoles = graphEligibleRolesQuery.data ?? []
+			const groupRoles = groupEligibleRolesQuery.data ?? []
+			return [...armRoles, ...graphRoles, ...groupRoles]
 		},
 	})
 
@@ -255,20 +297,6 @@ function RoleTable() {
 				valueGetter: params => params.data?.schedule.scopeDisplayName || '',
 			},
 			{
-				headerName: 'Expires',
-				cellRenderer: (params: { data: EligibleRole }) => {
-					return params.data.schedule.endDateTime ? (
-						<ExpiresCountdown futureDate={params.data.schedule.endDateTime} />
-					) : (
-						<span title="No expiration">Permanent</span>
-					)
-				},
-				flex: 1,
-				sortable: false,
-				resizable: true,
-				valueGetter: params => params.data?.schedule.endDateTime || '',
-			},
-			{
 				field: 'account.name',
 				headerName: 'Account',
 				hide: accountsQuery.data && accountsQuery.data.length <= 1,
@@ -296,6 +324,34 @@ function RoleTable() {
 				flex: 1,
 				sortable: false,
 				resizable: true,
+			},
+			{
+				headerName: 'Expires',
+				cellRenderer: (params: { data: EligibleRole }) => {
+					const isActivated = isEligibleRoleActivated(params.data)
+					const roleStatus = roleStatusQuery.data?.[params.data.id]
+
+					if (isActivated && roleStatus?.endDateTime) {
+						return (
+							<ExpiresCountdown
+								futureDate={roleStatus.endDateTime}
+								active={true}
+							/>
+						)
+					}
+
+					return params.data.schedule.endDateTime ? (
+						<ExpiresCountdown futureDate={params.data.schedule.endDateTime} />
+					) : (
+						<span title="No expiration">Permanent</span>
+					)
+				},
+				width: 100,
+				sortable: false,
+				resizable: true,
+				valueGetter: params => params.data?.schedule.endDateTime || '',
+				suppressColumnsToolPanel: true,
+				lockVisible: true,
 			},
 			{
 				headerName: '',
@@ -337,7 +393,7 @@ function RoleTable() {
 											color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
 											title={
 												isEligibleRoleNewlyActivated(params.data)
-													? `Role must be active for a minimum of at least 5 minutes before it can be disabled`
+													? `Role must be active for at least 5 minutes before it can be disabled`
 													: 'Deactivate Role'
 											}
 										/>
