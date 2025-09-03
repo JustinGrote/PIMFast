@@ -168,6 +168,7 @@ console.log(
 
 // Some mock providers
 const defaultNavClient = new NavigationClient()
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const loggingNavClient: INavigationClient = {
 	navigateInternal: async (url, options) => {
 		console.warn(`NavigateInternal`, url, options)
@@ -180,6 +181,7 @@ const loggingNavClient: INavigationClient = {
 }
 
 const fetchClient = new FetchClient()
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const loggingNetworkClient: INetworkModule = {
 	async sendGetRequestAsync<T>(
 		url: string,
