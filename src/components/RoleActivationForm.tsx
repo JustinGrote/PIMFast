@@ -33,8 +33,9 @@
  * @see RoleActivationExample.tsx for complete usage examples
  */
 
-import { activateEligibleRole, EligibleRoleActivationRequest } from '@/api/pim'
+import { activateEligibleRole } from '@/api/pim'
 import { throwError } from '@/api/util'
+import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest'
 import { EligibleRole } from '@/model/EligibleRole'
 import { RoleAssignmentScheduleRequest } from '@azure/arm-authorization'
 import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
@@ -121,15 +122,21 @@ export function RoleActivationForm({
 
 	const activationMutation = useMutation({
 		mutationKey: ['activateRole', eligibleRole.schedule.id],
-		mutationFn: async (activationRequest: EligibleRoleActivationRequest) =>
+		mutationFn: async (activationRequest: CommonRoleActivateRequest) =>
 			await activateEligibleRole(eligibleRole.account, activationRequest),
 		onSuccess: result => {
 			console.debug(`Submitted Activation Request ${result.id} for ${result.linkedRoleEligibilityScheduleId}`)
 			if (onActivateRoleSuccess) onActivateRoleSuccess(result)
 		},
 		onError: error => {
-			const message = error instanceof Error ? error.message : 'Unknown error occurred'
-			setErrorMessage(message)
+			// Handle Graph Errors
+			if ((error as any).errorEscaped.code && (error as any).errorEscaped.message) {
+				const { code, message } = (error as any).errorEscaped
+				setErrorMessage(`Code: ${code}\n Message: ${message}`)
+			} else {
+				const message = error instanceof Error ? error.message : JSON.stringify(error)
+				setErrorMessage(message)
+			}
 			openErrorModal()
 
 			if (onError) onError(error as Error)
@@ -144,34 +151,19 @@ export function RoleActivationForm({
 	function newActivationRequest(
 		{ durationMinutes, justification, startTime, ticketNumber }: FormValues,
 		{ account, schedule }: EligibleRole = eligibleRole,
-	): EligibleRoleActivationRequest {
-		// For ARM-based schedules, we need the original schedule
-		if (schedule.sourceType !== 'arm' || !schedule.originalSchedule) {
-			throw new Error('Only ARM-based role activation is currently supported')
-		}
-
-		const armSchedule = schedule.originalSchedule as any // ARM schedule type
-
+	): CommonRoleActivateRequest {
 		return {
 			requestType: 'SelfActivate',
+			sourceType: schedule.sourceType,
 			scope: schedule.scope ?? throwError('Scope is required'),
 			id: crypto.randomUUID(),
 			justification,
 			ticketInfo: ticketNumber ? { ticketNumber } : undefined,
-			linkedRoleEligibilityScheduleId:
-				armSchedule.roleEligibilityScheduleId ??
-				throwError(
-					'This is not a eligible role (missing linkedEligibileRoleId). This is a bug and you should report it.',
-				),
+			linkedRoleEligibilityScheduleId: schedule.id,
 			principalId: account.localAccountId,
 			roleDefinitionId: schedule.roleDefinitionId ?? throwError('Role definition ID is required'),
-			scheduleInfo: {
-				startDateTime: startTime || new Date(),
-				expiration: {
-					type: 'AfterDuration',
-					duration: dayjs.duration(durationMinutes, 'minutes').toISOString(),
-				},
-			},
+			startDateTime: startTime || new Date(),
+			duration: durationMinutes,
 		}
 	}
 

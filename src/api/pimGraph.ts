@@ -3,7 +3,11 @@ import { AccountInfo } from '@azure/msal-browser'
 import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure'
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary'
 import { AccountInfoHomeId, AccountInfoTokenCredential, scopesGraphAndAzure } from './auth'
-import { UnifiedRoleEligibilityScheduleInstance } from './generated/msgraph/models'
+import {
+	PrivilegedAccessGroupAssignmentScheduleRequest,
+	UnifiedRoleAssignmentScheduleRequest,
+	UnifiedRoleEligibilityScheduleInstance,
+} from './generated/msgraph/models'
 import { createPimGraphClient, PimGraphClient } from './generated/msgraph/pimGraphClient'
 
 const graphPimClients: Record<AccountInfoHomeId, PimGraphClient> = {}
@@ -94,3 +98,43 @@ export async function getMyEntraGroupEligibilityScheduleInstances(
 		throw error
 	}
 }
+
+export const createEntraRoleAssignmentScheduleRequest = (
+	account: AccountInfo,
+	request: UnifiedRoleAssignmentScheduleRequest,
+) => getPimClient(account).roleManagement.directory.roleAssignmentScheduleRequests.post(request)
+
+export const createEntraGroupAssignmentScheduleRequest = (
+	account: AccountInfo,
+	request: PrivilegedAccessGroupAssignmentScheduleRequest,
+) => getPimClient(account).identityGovernance.privilegedAccess.group.assignmentScheduleRequests.post(request)
+
+/**
+ * Deactivates a group assignment schedule request.
+ *
+ * @param account - The Azure MSAL account information for authentication.
+ * @param requestId - The ID of the assignment schedule request to deactivate.
+ * @returns A promise resolving to the updated request object.
+ */
+export const deactivateEntraGroupAssignmentScheduleRequest = async (account: AccountInfo, requestId: string) =>
+	getPimClient(account)
+		.identityGovernance.privilegedAccess.group.assignmentScheduleRequests.byPrivilegedAccessGroupAssignmentScheduleRequestId(
+			requestId,
+		)
+		.patch({
+			action: 'selfDeactivate',
+		})
+
+/**
+ * Deactivates a role assignment schedule request.
+ *
+ * @param account - The Azure MSAL account information for authentication.
+ * @param requestId - The ID of the assignment schedule request to deactivate.
+ * @returns A promise resolving to the updated request object.
+ */
+export const deactivateEntraRoleAssignmentScheduleRequest = async (account: AccountInfo, requestId: string) =>
+	getPimClient(account)
+		.roleManagement.directory.roleAssignmentScheduleRequests.byUnifiedRoleAssignmentScheduleRequestId(requestId)
+		.patch({
+			action: 'selfDeactivate',
+		})

@@ -6,6 +6,7 @@ import {
 	RoleEligibilityScheduleInstance,
 } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
+import { match } from 'ts-pattern'
 import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
 import { throwError } from './util'
 
@@ -108,11 +109,40 @@ export interface EligibleRoleActivationRequest extends RoleAssignmentScheduleReq
 	linkedRoleEligibilityScheduleId: string
 }
 
-export async function activateEligibleRole(
-	account: AccountInfo,
-	request: EligibleRoleActivationRequest,
-): Promise<RoleAssignmentScheduleRequest> {
-	return await getPimClient(account).roleAssignmentScheduleRequests.create(request.scope, request.id, request)
+import {
+	CommonRoleActivateRequest,
+	toArmRoleAssignmentScheduleRequest,
+	toEntraRoleAssignmentScheduleRequest,
+	toGroupRoleAssignmentScheduleRequest,
+} from '@/model/CommonRoleActivateRequest'
+import {
+	createEntraGroupAssignmentScheduleRequest,
+	createEntraRoleAssignmentScheduleRequest,
+	deactivateEntraGroupAssignmentScheduleRequest,
+	deactivateEntraRoleAssignmentScheduleRequest,
+} from './pimGraph'
+
+export async function activateEligibleRole(account: AccountInfo, request: CommonRoleActivateRequest): Promise<any> {
+	return await match(request)
+		// ARM-based role activation (Azure Resource roles)
+		.with({ sourceType: 'arm' }, async req => {
+			return await getPimClient(account).roleAssignmentScheduleRequests.create(
+				req.scope,
+				req.id,
+				toArmRoleAssignmentScheduleRequest(req),
+			)
+		})
+		// Entra ID directory role activation
+		.with({ sourceType: 'graph' }, async req => {
+			return await createEntraRoleAssignmentScheduleRequest(account, toEntraRoleAssignmentScheduleRequest(req))
+		})
+		// Group role activation
+		.with({ sourceType: 'group' }, async req => {
+			return await createEntraGroupAssignmentScheduleRequest(account, toGroupRoleAssignmentScheduleRequest(req))
+		})
+		.otherwise(() => {
+			throw new Error('Invalid activation request type')
+		})
 }
 
 export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
@@ -129,8 +159,13 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 			principalId: account.localAccountId,
 			roleDefinitionId: armSchedule.roleDefinitionId,
 		})
+	} else if (schedule.sourceType === 'graph' && schedule.originalSchedule) {
+		// Entra ID directory role deactivation
+		return await deactivateEntraRoleAssignmentScheduleRequest(account, schedule.id)
+	} else if (schedule.sourceType === 'group' && schedule.originalSchedule) {
+		// Group role deactivation
+		return await deactivateEntraGroupAssignmentScheduleRequest(account, schedule.id)
 	} else {
-		// For Graph-based and Group-based schedules, we need to implement the respective API deactivation
 		const roleType =
 			schedule.sourceType === 'graph' ? 'Entra ID' : schedule.sourceType === 'group' ? 'Group' : 'Non-ARM'
 		throw new Error(`${roleType} role deactivation is not yet implemented`)

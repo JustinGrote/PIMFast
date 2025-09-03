@@ -63,7 +63,7 @@ export interface CommonRoleSchedule {
 /**
  * Converts an Azure ARM RoleEligibilityScheduleInstance to the common interface.
  */
-export function armScheduleToCommon(schedule: RoleEligibilityScheduleInstance): CommonRoleSchedule {
+export function fromArmSchedule(schedule: RoleEligibilityScheduleInstance): CommonRoleSchedule {
 	return {
 		id: schedule.id ?? '',
 		scope: schedule.scope ?? '',
@@ -83,7 +83,7 @@ export function armScheduleToCommon(schedule: RoleEligibilityScheduleInstance): 
 /**
  * Converts a Microsoft Graph UnifiedRoleEligibilityScheduleInstanceExpanded to the common interface.
  */
-export function graphScheduleToCommon(schedule: UnifiedRoleEligibilityScheduleInstanceExpanded): CommonRoleSchedule {
+export function fromGraphSchedule(schedule: UnifiedRoleEligibilityScheduleInstanceExpanded): CommonRoleSchedule {
 	return {
 		id: schedule.id ?? '',
 		scope: schedule.directoryScopeId ?? '/',
@@ -103,7 +103,7 @@ export function graphScheduleToCommon(schedule: UnifiedRoleEligibilityScheduleIn
 /**
  * Converts a Microsoft Graph PrivilegedAccessGroupEligibilityScheduleInstanceExpanded to the common interface.
  */
-export function groupScheduleToCommon(
+export function fromGroupSchedule(
 	schedule: PrivilegedAccessGroupEligibilityScheduleInstanceExpanded,
 ): CommonRoleSchedule {
 	// Access ID determines the role type (owner or member)

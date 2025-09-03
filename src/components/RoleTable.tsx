@@ -3,7 +3,7 @@ import { getMilliseconds } from '@/api/time'
 import { throwIfNotError } from '@/api/util'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { armScheduleToCommon, graphScheduleToCommon, groupScheduleToCommon } from '@/model/CommonRoleSchedule'
+import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
 import { EligibleRole } from '@/model/EligibleRole'
 import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
@@ -93,7 +93,7 @@ function RoleTable() {
 				accounts.map(async account => {
 					const armScheduleInstances = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(account))
 					for (const schedule of armScheduleInstances) {
-						const commonSchedule = armScheduleToCommon(schedule)
+						const commonSchedule = fromArmSchedule(schedule)
 						allArmEligibleRoles.push({
 							account,
 							schedule: commonSchedule,
@@ -120,7 +120,7 @@ function RoleTable() {
 				accounts.map(async account => {
 					const graphScheduleResult = await getMyEntraRoleEligibilityScheduleInstances(account)
 					for (const schedule of graphScheduleResult) {
-						const commonSchedule = graphScheduleToCommon(schedule)
+						const commonSchedule = fromGraphSchedule(schedule)
 						allGraphEligibleRoles.push({
 							account,
 							schedule: commonSchedule,
@@ -147,7 +147,7 @@ function RoleTable() {
 				accounts.map(async account => {
 					const groupScheduleResult = await getMyEntraGroupEligibilityScheduleInstances(account)
 					for (const schedule of groupScheduleResult) {
-						const commonSchedule = groupScheduleToCommon(schedule)
+						const commonSchedule = fromGroupSchedule(schedule)
 						allGroupEligibleRoles.push({
 							account,
 							schedule: commonSchedule,
@@ -373,7 +373,7 @@ function RoleTable() {
 							<ActionIcon
 								size="sm"
 								variant="subtle"
-								disabled={!canActivateRole(params.data) || isEligibleRoleNewlyActivated(params.data)}
+								disabled={isEligibleRoleNewlyActivated(params.data)}
 								onClick={() => {
 									handleActivateClick(params.data)
 								}}
@@ -382,19 +382,7 @@ function RoleTable() {
 								}}
 							>
 								<Skeleton visible={!roleStatusQuery.isSuccess}>
-									{!canActivateRole(params.data) ? (
-										<IconClick
-											size="sm"
-											color="gray"
-											title={
-												params.data.schedule.sourceType === 'graph'
-													? 'Entra ID role activation not yet supported'
-													: params.data.schedule.sourceType === 'group'
-														? 'Group role activation not yet supported'
-														: 'Role activation not supported'
-											}
-										/>
-									) : isEligibleRoleActivated(params.data) ? (
+									{isEligibleRoleActivated(params.data) ? (
 										<IconPlayerStop
 											size="sm"
 											color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
@@ -439,11 +427,6 @@ function RoleTable() {
 		return roleStatusQuery.data[role.id]?.status === KnownStatus.Provisioned
 	}
 
-	/** Check if a role can be activated - currently only ARM-based roles are supported */
-	function canActivateRole(role: EligibleRole): boolean {
-		return role.schedule.sourceType === 'arm'
-	}
-
 	/** Azure PIM has a undocumented requirement that a role must be activated at least 5 minutes before it can be deactivated. We use this function to determine if that is the case, for purposes of disabling the stop button for instance */
 	function isEligibleRoleNewlyActivated(role: EligibleRole): boolean {
 		const AZURE_PIM_MIN_ACTIVATION_TIME = 5
@@ -454,11 +437,6 @@ function RoleTable() {
 	}
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
-		if (!canActivateRole(eligibleRole)) {
-			console.warn('Role activation not supported for this role type:', eligibleRole.schedule.sourceType)
-			return
-		}
-
 		setSelectedRole(eligibleRole)
 		if (!isEligibleRoleActivated(eligibleRole)) {
 			openActivationModal()
