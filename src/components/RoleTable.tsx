@@ -153,23 +153,29 @@ function RoleTable() {
 
 					if (isActivated && roleStatus?.endDateTime) {
 						return (
-							<ExpiresCountdown
-								futureDate={roleStatus.endDateTime}
-								active={true}
-							/>
+							<Center>
+								<ExpiresCountdown
+									futureDate={roleStatus.endDateTime}
+									active={true}
+								/>
+							</Center>
 						)
 					}
 
 					return params.data.schedule.endDateTime ? (
-						<ExpiresCountdown futureDate={params.data.schedule.endDateTime} />
+						<Center>
+							<ExpiresCountdown futureDate={params.data.schedule.endDateTime} />
+						</Center>
 					) : (
-						<Text
-							size="sm"
-							style={{ textAlign: 'center' }}
-							title="No expiration"
-						>
-							Permanent
-						</Text>
+						<Center>
+							<Text
+								size="sm"
+								style={{ textAlign: 'center' }}
+								title="No expiration"
+							>
+								Permanent
+							</Text>
+						</Center>
 					)
 				},
 				width: 100,
@@ -229,7 +235,7 @@ function RoleTable() {
 				resizable: false,
 			},
 		],
-		[roleStatusQuery.isSuccess],
+		[roleStatusQuery.isSuccess, accountsQuery.data, currentTab, isEligibleRoleActivated, isEligibleRoleNewlyActivated],
 	)
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
@@ -360,6 +366,7 @@ function RoleTable() {
 								filter: true,
 								resizable: true,
 							}}
+							key={roleStatusQuery.isSuccess ? 'success' : 'loading'}
 						/>
 						<LoadingOverlay />
 					</div>

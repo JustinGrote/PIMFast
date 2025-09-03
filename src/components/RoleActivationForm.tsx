@@ -37,7 +37,6 @@ import { activateEligibleRole } from '@/api/pim'
 import { throwError } from '@/api/util'
 import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest'
 import { EligibleRole } from '@/model/EligibleRole'
-import { RoleAssignmentScheduleRequest } from '@azure/arm-authorization'
 import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { DateTimePicker } from '@mantine/dates'
 import { useForm } from '@mantine/form'
@@ -55,7 +54,7 @@ interface RoleActivationFormProps {
 	/** The eligible role to create an activation request for */
 	eligibleRole: EligibleRole
 	/** Called when the form is successfully submitted */
-	onSuccess?: (request: RoleAssignmentScheduleRequest) => void
+	onSuccess?: (request: CommonRoleActivateRequest) => void
 	/** Called when the form submission fails */
 	onError?: (error: Error) => void
 	/** Called when the form is cancelled */
@@ -123,7 +122,7 @@ export function RoleActivationForm({
 		mutationFn: async (activationRequest: CommonRoleActivateRequest) =>
 			await activateEligibleRole(eligibleRole.account, activationRequest),
 		onSuccess: result => {
-			console.debug(`Submitted Activation Request ${result.id} for ${result.linkedRoleEligibilityScheduleId}`)
+			console.debug(`Submitted Activation Request ${result.id} for role ${result.roleDefinitionId}`)
 			if (onActivateRoleSuccess) onActivateRoleSuccess(result)
 		},
 		onError: error => {

@@ -136,8 +136,8 @@ export function fromGroupAssignment(
 
 	return {
 		id: assignment.id ?? '',
-		scope: assignment.groupId ?? '',
-		roleDefinitionId: assignment.accessId ?? '',
+		scope: assignment.accessId ?? '',
+		roleDefinitionId: assignment.groupId ?? '',
 		roleDefinitionDisplayName: `${roleDisplayName} of ${groupDisplayName}`,
 		scopeDisplayName: groupDisplayName,
 		scopeType: 'group',

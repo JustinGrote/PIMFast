@@ -116,29 +116,55 @@ import {
 	toGroupRoleAssignmentScheduleRequest,
 } from '@/model/CommonRoleActivateRequest'
 import {
+	fromArmAssignment,
+	fromGraphAssignment,
+	fromGroupAssignment,
+} from '@/model/CommonRoleAssignmentScheduleInstance'
+import {
 	createEntraGroupAssignmentScheduleRequest,
 	createEntraRoleAssignmentScheduleRequest,
 	deactivateEntraGroupAssignmentScheduleRequest,
 	deactivateEntraRoleAssignmentScheduleRequest,
 } from './pimGraph'
 
-export async function activateEligibleRole(account: AccountInfo, request: CommonRoleActivateRequest): Promise<any> {
+export async function activateEligibleRole(account: AccountInfo, request: CommonRoleActivateRequest) {
 	return await match(request)
 		// ARM-based role activation (Azure Resource roles)
 		.with({ sourceType: 'arm' }, async req => {
-			return await getPimClient(account).roleAssignmentScheduleRequests.create(
+			const result = await getPimClient(account).roleAssignmentScheduleRequests.create(
 				req.scope,
 				req.id,
 				toArmRoleAssignmentScheduleRequest(req),
 			)
+			if (!result) {
+				throw new Error('Activating Role completed but no object was returned. This is a bug.')
+			}
+			return fromArmAssignment(result)
 		})
 		// Entra ID directory role activation
 		.with({ sourceType: 'graph' }, async req => {
-			return await createEntraRoleAssignmentScheduleRequest(account, toEntraRoleAssignmentScheduleRequest(req))
+			const result = await createEntraRoleAssignmentScheduleRequest(account, toEntraRoleAssignmentScheduleRequest(req))
+			if (!result) {
+				throw new Error('Activating Role completed but no object was returned. This is a bug.')
+			}
+			return fromGraphAssignment({
+				id: result.id!,
+				principalId: result.principalId!,
+				roleDefinitionId: result.roleDefinitionId!,
+			})
 		})
 		// Group role activation
 		.with({ sourceType: 'group' }, async req => {
-			return await createEntraGroupAssignmentScheduleRequest(account, toGroupRoleAssignmentScheduleRequest(req))
+			const result = await createEntraGroupAssignmentScheduleRequest(account, toGroupRoleAssignmentScheduleRequest(req))
+			if (!result) {
+				throw new Error('Activating Role completed but no object was returned. This is a bug.')
+			}
+			return fromGroupAssignment({
+				id: result.id!,
+				principalId: result.principalId!,
+				groupId: result.groupId!,
+				accessId: result.accessId!,
+			})
 		})
 		.otherwise(() => {
 			throw new Error('Invalid activation request type')
@@ -161,10 +187,10 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 		})
 	} else if (schedule.sourceType === 'graph' && schedule.originalSchedule) {
 		// Entra ID directory role deactivation
-		return await deactivateEntraRoleAssignmentScheduleRequest(account, schedule.id)
+		return await deactivateEntraRoleAssignmentScheduleRequest(eligibleRole)
 	} else if (schedule.sourceType === 'group' && schedule.originalSchedule) {
 		// Group role deactivation
-		return await deactivateEntraGroupAssignmentScheduleRequest(account, schedule.id)
+		return await deactivateEntraGroupAssignmentScheduleRequest(eligibleRole)
 	} else {
 		const roleType =
 			schedule.sourceType === 'graph' ? 'Entra ID' : schedule.sourceType === 'group' ? 'Group' : 'Non-ARM'

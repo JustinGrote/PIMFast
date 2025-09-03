@@ -285,7 +285,8 @@ export function useRoleTableQueries() {
 			return assignment.status === KnownStatus.Provisioned
 		} else {
 			// For Graph and Group assignments, check if assignmentType indicates active status
-			return assignment.status === 'Activated' || assignment.status === 'Active'
+			const status = assignment.status?.toLowerCase()
+			return status === 'activated' || status === 'active'
 		}
 	}
 

@@ -3,6 +3,7 @@ import {
 	UnifiedRoleAssignmentScheduleInstanceExpanded,
 } from '@/model/CommonRoleAssignmentScheduleInstance'
 import { PrivilegedAccessGroupEligibilityScheduleInstanceExpanded } from '@/model/CommonRoleSchedule'
+import { EligibleRole } from '@/model/EligibleRole'
 import { AccountInfo } from '@azure/msal-browser'
 import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure'
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary'
@@ -120,14 +121,14 @@ export const createEntraGroupAssignmentScheduleRequest = (
  * @param requestId - The ID of the assignment schedule request to deactivate.
  * @returns A promise resolving to the updated request object.
  */
-export const deactivateEntraGroupAssignmentScheduleRequest = async (account: AccountInfo, requestId: string) =>
-	getPimClient(account)
-		.identityGovernance.privilegedAccess.group.assignmentScheduleRequests.byPrivilegedAccessGroupAssignmentScheduleRequestId(
-			requestId,
-		)
-		.patch({
-			action: 'selfDeactivate',
-		})
+export const deactivateEntraGroupAssignmentScheduleRequest = async (role: EligibleRole) =>
+	getPimClient(role.account).identityGovernance.privilegedAccess.group.assignmentScheduleRequests.post({
+		action: 'selfDeactivate',
+		principalId: role.schedule.principalId,
+		groupId: role.schedule.roleDefinitionId,
+		accessId: role.schedule.scope === 'owner' ? 'owner' : 'member',
+		justification: 'User Requested Deactivation (PIMFast)',
+	})
 
 /**
  * Deactivates a role assignment schedule request.
@@ -136,12 +137,13 @@ export const deactivateEntraGroupAssignmentScheduleRequest = async (account: Acc
  * @param requestId - The ID of the assignment schedule request to deactivate.
  * @returns A promise resolving to the updated request object.
  */
-export const deactivateEntraRoleAssignmentScheduleRequest = async (account: AccountInfo, requestId: string) =>
-	getPimClient(account)
-		.roleManagement.directory.roleAssignmentScheduleRequests.byUnifiedRoleAssignmentScheduleRequestId(requestId)
-		.patch({
-			action: 'selfDeactivate',
-		})
+export const deactivateEntraRoleAssignmentScheduleRequest = async (role: EligibleRole) =>
+	getPimClient(role.account).roleManagement.directory.roleAssignmentScheduleRequests.post({
+		action: 'selfDeactivate',
+		principalId: role.schedule.principalId,
+		roleDefinitionId: role.schedule.roleDefinitionId,
+		directoryScopeId: role.schedule.scope,
+	})
 
 /**
  * Retrieves the current user's role assignment schedule instances from Microsoft Graph PIM.
