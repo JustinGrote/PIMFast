@@ -1,8 +1,12 @@
+import {
+	PrivilegedAccessGroupAssignmentScheduleInstanceExpanded,
+	UnifiedRoleAssignmentScheduleInstanceExpanded,
+} from '@/model/CommonRoleAssignmentScheduleInstance'
 import { PrivilegedAccessGroupEligibilityScheduleInstanceExpanded } from '@/model/CommonRoleSchedule'
 import { AccountInfo } from '@azure/msal-browser'
 import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure'
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary'
-import { AccountInfoHomeId, AccountInfoTokenCredential, scopesGraphAndAzure } from './auth'
+import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
 import {
 	PrivilegedAccessGroupAssignmentScheduleRequest,
 	UnifiedRoleAssignmentScheduleRequest,
@@ -12,7 +16,7 @@ import { createPimGraphClient, PimGraphClient } from './generated/msgraph/pimGra
 
 const graphPimClients: Record<AccountInfoHomeId, PimGraphClient> = {}
 
-export function createPimClient(account: AccountInfo, scopes = scopesGraphAndAzure): PimGraphClient {
+export function createPimClient(account: AccountInfo): PimGraphClient {
 	try {
 		const client = createPimGraphClient(
 			new FetchRequestAdapter(new AzureIdentityAuthenticationProvider(new AccountInfoTokenCredential(account))),
@@ -138,3 +142,63 @@ export const deactivateEntraRoleAssignmentScheduleRequest = async (account: Acco
 		.patch({
 			action: 'selfDeactivate',
 		})
+
+/**
+ * Retrieves the current user's role assignment schedule instances from Microsoft Graph PIM.
+ * These represent active role assignments.
+ *
+ * @param account - The Azure MSAL account information for authentication.
+ * @returns A promise that resolves to an array of UnifiedRoleAssignmentScheduleInstance objects.
+ * @throws Will throw an error if fetching fails.
+ */
+export async function getMyEntraRoleAssignmentScheduleInstances(
+	account: AccountInfo,
+): Promise<UnifiedRoleAssignmentScheduleInstanceExpanded[]> {
+	try {
+		const client = await getPimClient(account)
+
+		const request =
+			client.roleManagement.directory.roleAssignmentScheduleInstances.filterByCurrentUserWithOn('principal')
+		const response = await request.get({
+			queryParameters: {
+				expand: ['roleDefinition', 'principal'],
+			},
+		})
+
+		return (response?.value as UnifiedRoleAssignmentScheduleInstanceExpanded[]) ?? []
+	} catch (error) {
+		console.error('Error fetching Entra role assignment schedule instances:', error)
+		throw error
+	}
+}
+
+/**
+ * Retrieves the current user's group assignment schedule instances from Microsoft Graph PIM.
+ * These represent active group role assignments.
+ *
+ * @param account - The Azure MSAL account information for authentication.
+ * @returns A promise that resolves to an array of PrivilegedAccessGroupAssignmentScheduleInstance objects.
+ * @throws Will throw an error if fetching fails.
+ */
+export async function getMyEntraGroupAssignmentScheduleInstances(
+	account: AccountInfo,
+): Promise<PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]> {
+	try {
+		const client = await getPimClient(account)
+
+		const request =
+			client.identityGovernance.privilegedAccess.group.assignmentScheduleInstances.filterByCurrentUserWithOn(
+				'principal',
+			)
+		const response = await request.get({
+			queryParameters: {
+				expand: ['group', 'principal'],
+			},
+		})
+
+		return (response?.value as PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]) ?? []
+	} catch (error) {
+		console.error('Error fetching group assignment schedule instances:', error)
+		throw error
+	}
+}

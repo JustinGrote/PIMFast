@@ -1,7 +1,13 @@
 import { getMilliseconds } from '@/api/time'
+import {
+	CommonRoleAssignmentScheduleInstance,
+	fromArmAssignment,
+	fromGraphAssignment,
+	fromGroupAssignment,
+} from '@/model/CommonRoleAssignmentScheduleInstance'
 import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
 import { EligibleRole } from '@/model/EligibleRole'
-import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
+import { KnownStatus } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
@@ -12,7 +18,9 @@ import {
 	getMyRoleEligibilityScheduleInstances,
 } from '../api/pim'
 import {
+	getMyEntraGroupAssignmentScheduleInstances,
 	getMyEntraGroupEligibilityScheduleInstances,
+	getMyEntraRoleAssignmentScheduleInstances,
 	getMyEntraRoleEligibilityScheduleInstances,
 } from '../api/pimGraph'
 
@@ -139,58 +147,121 @@ export function useRoleTableQueries() {
 		},
 	})
 
-	type HomeAccountInfoId = AccountInfo['homeAccountId']
-	type RoleAssignmentsByAccount = Record<HomeAccountInfoId, RoleAssignmentScheduleInstance[]>
-	const roleAssignmentsScheduleInstancesByAccountQuery = useQuery<RoleAssignmentsByAccount>({
-		queryKey: ['pim', 'roleAssignmentScheduleInstances', accountsQuery.data],
+	// ARM role assignment schedule instances
+	const armRoleAssignmentsQuery = useQuery<CommonRoleAssignmentScheduleInstance[]>({
+		queryKey: ['pim', 'armRoleAssignments', accountsQuery.data],
 		enabled: accountsQuery.isSuccess,
 		refetchInterval: getMilliseconds(10, 'seconds'),
 		queryFn: async () => {
 			const accounts = accountsQuery.data ?? []
+			const allArmAssignments: CommonRoleAssignmentScheduleInstance[] = []
 
-			// Fetch schedule instances for all accounts in parallel
-			const accountSchedulePromises = accounts.map(async account => ({
-				account,
-				schedules: await Array.fromAsync(getMyRoleAssignmentScheduleInstances(account)),
-			}))
+			await Promise.all(
+				accounts.map(async account => {
+					const armAssignments = await Array.fromAsync(getMyRoleAssignmentScheduleInstances(account))
+					for (const assignment of armAssignments) {
+						allArmAssignments.push(fromArmAssignment(assignment))
+					}
+				}),
+			)
 
-			const accountScheduleResults = await Promise.all(accountSchedulePromises)
-
-			// Reconstruct the lookup object
-			const roleAssignmentsByAccount: RoleAssignmentsByAccount = {}
-			for (const result of accountScheduleResults) {
-				roleAssignmentsByAccount[result.account.homeAccountId] = result.schedules
-			}
-
-			return roleAssignmentsByAccount
+			return allArmAssignments
 		},
 	})
 
-	type RoleToStatusLookup = Record<EligibleRole['id'], RoleAssignmentScheduleInstance | undefined>
-	const roleStatusQuery = useQuery<RoleToStatusLookup>({
+	// Graph role assignment schedule instances
+	const graphRoleAssignmentsQuery = useQuery<CommonRoleAssignmentScheduleInstance[]>({
+		queryKey: ['pim', 'graphRoleAssignments', accountsQuery.data],
+		enabled: accountsQuery.isSuccess,
+		refetchInterval: getMilliseconds(10, 'seconds'),
+		queryFn: async () => {
+			const accounts = accountsQuery.data ?? []
+			const allGraphAssignments: CommonRoleAssignmentScheduleInstance[] = []
+
+			await Promise.all(
+				accounts.map(async account => {
+					const graphAssignments = await getMyEntraRoleAssignmentScheduleInstances(account)
+					for (const assignment of graphAssignments) {
+						allGraphAssignments.push(fromGraphAssignment(assignment))
+					}
+				}),
+			)
+
+			return allGraphAssignments
+		},
+	})
+
+	// Group role assignment schedule instances
+	const groupRoleAssignmentsQuery = useQuery<CommonRoleAssignmentScheduleInstance[]>({
+		queryKey: ['pim', 'groupRoleAssignments', accountsQuery.data],
+		enabled: accountsQuery.isSuccess,
+		refetchInterval: getMilliseconds(10, 'seconds'),
+		queryFn: async () => {
+			const accounts = accountsQuery.data ?? []
+			const allGroupAssignments: CommonRoleAssignmentScheduleInstance[] = []
+
+			await Promise.all(
+				accounts.map(async account => {
+					const groupAssignments = await getMyEntraGroupAssignmentScheduleInstances(account)
+					for (const assignment of groupAssignments) {
+						allGroupAssignments.push(fromGroupAssignment(assignment))
+					}
+				}),
+			)
+
+			return allGroupAssignments
+		},
+	})
+
+	// Combined role assignments query
+	const roleAssignmentsQuery = useQuery<CommonRoleAssignmentScheduleInstance[]>({
 		queryKey: [
 			'pim',
-			'eligibleRoleStatus',
-			eligibleRolesQuery.data,
-			roleAssignmentsScheduleInstancesByAccountQuery.data,
+			'roleAssignments',
+			armRoleAssignmentsQuery.data,
+			graphRoleAssignmentsQuery.data,
+			groupRoleAssignmentsQuery.data,
 		],
-		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsScheduleInstancesByAccountQuery.isSuccess,
+		enabled:
+			armRoleAssignmentsQuery.isSuccess && graphRoleAssignmentsQuery.isSuccess && groupRoleAssignmentsQuery.isSuccess,
+		queryFn: async () => {
+			const armAssignments = armRoleAssignmentsQuery.data ?? []
+			const graphAssignments = graphRoleAssignmentsQuery.data ?? []
+			const groupAssignments = groupRoleAssignmentsQuery.data ?? []
+			return [...armAssignments, ...graphAssignments, ...groupAssignments]
+		},
+	})
+
+	type RoleToStatusLookup = Record<EligibleRole['id'], CommonRoleAssignmentScheduleInstance | undefined>
+	const roleStatusQuery = useQuery<RoleToStatusLookup>({
+		queryKey: ['pim', 'eligibleRoleStatus', eligibleRolesQuery.data, roleAssignmentsQuery.data],
+		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsQuery.isSuccess,
 		queryFn: () => {
 			const roleToStatusLookup: RoleToStatusLookup = {}
-			const roleAssignmentAccountMap = roleAssignmentsScheduleInstancesByAccountQuery.data ?? {}
+			const roleAssignments = roleAssignmentsQuery.data ?? []
 			const eligibleRoles = eligibleRolesQuery.data ?? []
 
 			for (const role of eligibleRoles) {
-				// Only ARM-based roles can be checked via role assignment schedule instances
-				if (role.schedule.sourceType === 'arm') {
-					roleToStatusLookup[role.id] = roleAssignmentAccountMap[role.account.homeAccountId]?.find(
-						assignment => assignment.linkedRoleEligibilityScheduleInstanceId === role.schedule.id,
-					)
-				} else {
-					// Graph-based roles would need a different status checking mechanism
-					roleToStatusLookup[role.id] = undefined
-				}
+				// Find the matching assignment for this role
+				const matchingAssignment = roleAssignments.find(assignment => {
+					// For ARM roles, match using linkedRoleEligibilityScheduleInstanceId
+					if (role.schedule.sourceType === 'arm' && assignment.sourceType === 'arm') {
+						return assignment.linkedRoleEligibilityScheduleInstanceId === role.schedule.id
+					}
+					// For Graph and Group roles, match by role definition and scope
+					if (role.schedule.sourceType === assignment.sourceType) {
+						return (
+							assignment.roleDefinitionId === role.schedule.roleDefinitionId &&
+							assignment.scope === role.schedule.scope &&
+							assignment.principalId === role.schedule.principalId
+						)
+					}
+					return false
+				})
+
+				roleToStatusLookup[role.id] = matchingAssignment
 			}
+
 			return roleToStatusLookup
 		},
 	})
@@ -206,16 +277,25 @@ export function useRoleTableQueries() {
 
 	function isEligibleRoleActivated(role: EligibleRole): boolean {
 		if (!roleStatusQuery.data) return false
-		return roleStatusQuery.data[role.id]?.status === KnownStatus.Provisioned
+		const assignment = roleStatusQuery.data[role.id]
+		if (!assignment) return false
+
+		// Check status based on source type
+		if (assignment.sourceType === 'arm') {
+			return assignment.status === KnownStatus.Provisioned
+		} else {
+			// For Graph and Group assignments, check if assignmentType indicates active status
+			return assignment.status === 'Activated' || assignment.status === 'Active'
+		}
 	}
 
 	/** Azure PIM has a undocumented requirement that a role must be activated at least 5 minutes before it can be deactivated. We use this function to determine if that is the case, for purposes of disabling the stop button for instance */
 	function isEligibleRoleNewlyActivated(role: EligibleRole): boolean {
 		const AZURE_PIM_MIN_ACTIVATION_TIME = 5
 		if (!roleStatusQuery.data) return false
-		const startDateTime = roleStatusQuery.data[role.id]?.startDateTime
-		if (!startDateTime) return false
-		return dayjs().diff(dayjs(startDateTime), 'minutes') < AZURE_PIM_MIN_ACTIVATION_TIME
+		const assignment = roleStatusQuery.data[role.id]
+		if (!assignment || !assignment.startDateTime) return false
+		return dayjs().diff(dayjs(assignment.startDateTime), 'minutes') < AZURE_PIM_MIN_ACTIVATION_TIME
 	}
 
 	return {
@@ -225,7 +305,10 @@ export function useRoleTableQueries() {
 		graphEligibleRolesQuery,
 		groupEligibleRolesQuery,
 		eligibleRolesQuery,
-		roleAssignmentsScheduleInstancesByAccountQuery,
+		armRoleAssignmentsQuery,
+		graphRoleAssignmentsQuery,
+		groupRoleAssignmentsQuery,
+		roleAssignmentsQuery,
 		roleStatusQuery,
 		deactivateEligibleRoleMutation,
 		refresh,
