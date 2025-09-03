@@ -79,8 +79,6 @@ interface PolicyRequirements {
 	maxDuration: string // ISO 8601 duration format (e.g., 'PT8H')
 }
 
-export type { PolicyRequirements }
-
 /**
  * A form component for creating role activation requests.
  * Uses @mantine/form for form state management and validation.
@@ -129,8 +127,11 @@ export function RoleActivationForm({
 			if (onActivateRoleSuccess) onActivateRoleSuccess(result)
 		},
 		onError: error => {
-			// Handle Graph Errors
-			if ((error as any).errorEscaped.code && (error as any).errorEscaped.message) {
+			console.error('Error activating role:', error)
+			// FIXME: Use Type guards
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			if ((error as any).errorEscaped?.code && (error as any).errorEscaped?.message) {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				const { code, message } = (error as any).errorEscaped
 				setErrorMessage(`Code: ${code}\n Message: ${message}`)
 			} else {

@@ -1,12 +1,8 @@
 import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/api/azureResourceId'
-import { getMilliseconds } from '@/api/time'
 import { throwIfNotError } from '@/api/util'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
 import { EligibleRole } from '@/model/EligibleRole'
-import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
-import { AccountInfo } from '@azure/msal-browser'
 import {
 	ActionIcon,
 	Button,
@@ -23,7 +19,6 @@ import {
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
@@ -31,19 +26,10 @@ import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
 import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
-import { getAllAccounts } from '../api/auth'
-import {
-	deactivateEligibleRole,
-	getMyRoleAssignmentScheduleInstances,
-	getMyRoleEligibilityScheduleInstances,
-} from '../api/pim'
-import {
-	getMyEntraGroupEligibilityScheduleInstances,
-	getMyEntraRoleEligibilityScheduleInstances,
-} from '../api/pimGraph'
 import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
 import ResolvedTenantName from './ResolvedTenantName'
+import { useRoleTableQueries } from './RoleTable.query'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -54,186 +40,18 @@ function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
 	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
 	const [gridApi, setGridApi] = useState<GridApi<EligibleRole> | null>(null)
-
-	const refetchInterval = getMilliseconds(30, 'seconds')
-
-	const queryClient = useQueryClient()
 	const [filterQuery, setFilterQuery] = useState('')
 
-	const accountsQuery = useQuery<AccountInfo[]>({
-		queryKey: ['pim', 'accounts'],
-		queryFn: getAllAccounts,
-	})
-
-	const { data: currentTab, refetch } = useQuery<chrome.tabs.Tab | undefined>({
-		queryKey: ['currentTab'],
-		queryFn: async () => {
-			const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-			return tab
-		},
-	})
-
-	chrome.tabs.onUpdated.addListener((_tabId, _changeInfo, tab) => {
-		// We only care about updates to the active tab for this side panel.
-		if (tab.active && tab.windowId === currentTab?.windowId) {
-			refetch()
-		}
-	})
-
-	const armEligibleRolesQuery = useQuery<EligibleRole[]>({
-		queryKey: ['pim', 'armEligibleRoles', accountsQuery.data],
-		enabled: accountsQuery.isSuccess,
-		refetchInterval,
-		throwOnError: true,
-		queryFn: async () => {
-			const accounts = accountsQuery.data ?? []
-			const allArmEligibleRoles: EligibleRole[] = []
-
-			await Promise.all(
-				accounts.map(async account => {
-					const armScheduleInstances = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(account))
-					for (const schedule of armScheduleInstances) {
-						const commonSchedule = fromArmSchedule(schedule)
-						allArmEligibleRoles.push({
-							account,
-							schedule: commonSchedule,
-							id: `${account.homeAccountId}-arm-${commonSchedule.id}`,
-						})
-					}
-				}),
-			)
-
-			return allArmEligibleRoles
-		},
-	})
-
-	const graphEligibleRolesQuery = useQuery<EligibleRole[]>({
-		queryKey: ['pim', 'graphEligibleRoles', accountsQuery.data],
-		enabled: accountsQuery.isSuccess,
-		refetchInterval,
-		throwOnError: true,
-		queryFn: async () => {
-			const accounts = accountsQuery.data ?? []
-			const allGraphEligibleRoles: EligibleRole[] = []
-
-			await Promise.all(
-				accounts.map(async account => {
-					const graphScheduleResult = await getMyEntraRoleEligibilityScheduleInstances(account)
-					for (const schedule of graphScheduleResult) {
-						const commonSchedule = fromGraphSchedule(schedule)
-						allGraphEligibleRoles.push({
-							account,
-							schedule: commonSchedule,
-							id: `${account.homeAccountId}-graph-${commonSchedule.id}`,
-						})
-					}
-				}),
-			)
-
-			return allGraphEligibleRoles
-		},
-	})
-
-	const groupEligibleRolesQuery = useQuery<EligibleRole[]>({
-		queryKey: ['pim', 'groupEligibleRoles', accountsQuery.data],
-		enabled: accountsQuery.isSuccess,
-		refetchInterval,
-		throwOnError: true,
-		queryFn: async () => {
-			const accounts = accountsQuery.data ?? []
-			const allGroupEligibleRoles: EligibleRole[] = []
-
-			await Promise.all(
-				accounts.map(async account => {
-					const groupScheduleResult = await getMyEntraGroupEligibilityScheduleInstances(account)
-					for (const schedule of groupScheduleResult) {
-						const commonSchedule = fromGroupSchedule(schedule)
-						allGroupEligibleRoles.push({
-							account,
-							schedule: commonSchedule,
-							id: `${account.homeAccountId}-group-${commonSchedule.id}`,
-						})
-					}
-				}),
-			)
-
-			return allGroupEligibleRoles
-		},
-	})
-
-	const eligibleRolesQuery = useQuery<EligibleRole[]>({
-		queryKey: [
-			'pim',
-			'eligibleRoles',
-			armEligibleRolesQuery.data,
-			graphEligibleRolesQuery.data,
-			groupEligibleRolesQuery.data,
-		],
-		enabled: armEligibleRolesQuery.isSuccess && graphEligibleRolesQuery.isSuccess && groupEligibleRolesQuery.isSuccess,
-		throwOnError: true,
-		queryFn: async () => {
-			const armRoles = armEligibleRolesQuery.data ?? []
-			const graphRoles = graphEligibleRolesQuery.data ?? []
-			const groupRoles = groupEligibleRolesQuery.data ?? []
-			return [...armRoles, ...graphRoles, ...groupRoles]
-		},
-	})
-
-	type HomeAccountInfoId = AccountInfo['homeAccountId']
-	type RoleAssignmentsByAccount = Record<HomeAccountInfoId, RoleAssignmentScheduleInstance[]>
-	const roleAssignmentsScheduleInstancesByAccountQuery = useQuery<RoleAssignmentsByAccount>({
-		queryKey: ['pim', 'roleAssignmentScheduleInstances', accountsQuery.data],
-		enabled: accountsQuery.isSuccess,
-		refetchInterval: getMilliseconds(10, 'seconds'),
-		queryFn: async () => {
-			const accounts = accountsQuery.data ?? []
-
-			// Fetch schedule instances for all accounts in parallel
-			const accountSchedulePromises = accounts.map(async account => ({
-				account,
-				schedules: await Array.fromAsync(getMyRoleAssignmentScheduleInstances(account)),
-			}))
-
-			const accountScheduleResults = await Promise.all(accountSchedulePromises)
-
-			// Reconstruct the lookup object
-			const roleAssignmentsByAccount: RoleAssignmentsByAccount = {}
-			for (const result of accountScheduleResults) {
-				roleAssignmentsByAccount[result.account.homeAccountId] = result.schedules
-			}
-
-			return roleAssignmentsByAccount
-		},
-	})
-
-	type RoleToStatusLookup = Record<EligibleRole['id'], RoleAssignmentScheduleInstance | undefined>
-	const roleStatusQuery = useQuery<RoleToStatusLookup>({
-		queryKey: [
-			'pim',
-			'eligibleRoleStatus',
-			eligibleRolesQuery.data,
-			roleAssignmentsScheduleInstancesByAccountQuery.data,
-		],
-		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsScheduleInstancesByAccountQuery.isSuccess,
-		queryFn: () => {
-			const roleToStatusLookup: RoleToStatusLookup = {}
-			const roleAssignmentAccountMap = roleAssignmentsScheduleInstancesByAccountQuery.data ?? {}
-			const eligibleRoles = eligibleRolesQuery.data ?? []
-
-			for (const role of eligibleRoles) {
-				// Only ARM-based roles can be checked via role assignment schedule instances
-				if (role.schedule.sourceType === 'arm') {
-					roleToStatusLookup[role.id] = roleAssignmentAccountMap[role.account.homeAccountId]?.find(
-						assignment => assignment.linkedRoleEligibilityScheduleInstanceId === role.schedule.id,
-					)
-				} else {
-					// Graph-based roles would need a different status checking mechanism
-					roleToStatusLookup[role.id] = undefined
-				}
-			}
-			return roleToStatusLookup
-		},
-	})
+	const {
+		accountsQuery,
+		currentTab,
+		eligibleRolesQuery,
+		roleStatusQuery,
+		deactivateEligibleRoleMutation,
+		refresh,
+		isEligibleRoleActivated,
+		isEligibleRoleNewlyActivated,
+	} = useRoleTableQueries()
 
 	const columnDefs: ColDef<EligibleRole>[] = useMemo(
 		() => [
@@ -300,28 +118,29 @@ function RoleTable() {
 			{
 				field: 'account.name',
 				headerName: 'Account',
-				hide: accountsQuery.data && accountsQuery.data.length <= 1,
 				cellRenderer: (params: { data: EligibleRole }) => (
-					<span title={params.data.account.name}>{params.data.account.username}</span>
+					<Text
+						size="sm"
+						title={params.data.account.username}
+					>
+						{params.data.account.name ?? params.data.account.username}
+					</Text>
 				),
 				flex: 1,
 				sortable: true,
 				resizable: true,
+				hide: accountsQuery.data && accountsQuery.data.length <= 1,
 			},
 			{
 				headerName: 'Tenant',
-				cellRenderer: (params: { data: EligibleRole }) => {
-					return (
-						<ResolvedTenantName
-							account={params.data.account}
-							roleOrTenantId={
-								['group', 'graph'].includes(params.data.schedule.sourceType)
-									? params.data.account.tenantId
-									: params.data
-							}
-						/>
-					)
-				},
+				cellRenderer: (params: { data: EligibleRole }) => (
+					<ResolvedTenantName
+						account={params.data.account}
+						roleOrTenantId={
+							['group', 'graph'].includes(params.data.schedule.sourceType) ? params.data.account.tenantId : params.data
+						}
+					/>
+				),
 				flex: 1,
 				sortable: false,
 				resizable: true,
@@ -412,29 +231,6 @@ function RoleTable() {
 		],
 		[roleStatusQuery.isSuccess],
 	)
-
-	async function refresh() {
-		await queryClient.invalidateQueries({ queryKey: ['pim'] })
-	}
-
-	const deactivateEligibleRoleMutation = useMutation({
-		mutationKey: ['deactivateEligibleRole'],
-		mutationFn: deactivateEligibleRole,
-	})
-
-	function isEligibleRoleActivated(role: EligibleRole): boolean {
-		if (!roleStatusQuery.data) return false
-		return roleStatusQuery.data[role.id]?.status === KnownStatus.Provisioned
-	}
-
-	/** Azure PIM has a undocumented requirement that a role must be activated at least 5 minutes before it can be deactivated. We use this function to determine if that is the case, for purposes of disabling the stop button for instance */
-	function isEligibleRoleNewlyActivated(role: EligibleRole): boolean {
-		const AZURE_PIM_MIN_ACTIVATION_TIME = 5
-		if (!roleStatusQuery.data) return false
-		const startDateTime = roleStatusQuery.data[role.id]?.startDateTime
-		if (!startDateTime) return false
-		return dayjs().diff(dayjs(startDateTime), 'minutes') < AZURE_PIM_MIN_ACTIVATION_TIME
-	}
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
 		setSelectedRole(eligibleRole)
