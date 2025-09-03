@@ -74,6 +74,9 @@
     "patchedDependencies": {
       "@azure/msal-browser@3.30.0": "patches/@azure__msal-browser@3.30.0.patch",
       "@microsoft/kiota-abstractions": "patches/@microsoft__kiota-abstractions.patch"
-    }
+    },
+    "ignoredBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
