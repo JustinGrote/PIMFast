@@ -208,8 +208,8 @@ export const client = new PublicClientApplication({
 			piiLoggingEnabled: true,
 		},
 		// allowNativeBroker: true,
-		navigationClient: loggingNavClient, // Use the logging navigation client
-		networkClient: loggingNetworkClient, // Use the logging network client
+		// navigationClient: loggingNavClient, // For Debugging Purposes
+		// networkClient: loggingNetworkClient, // For Debugging Purposes
 	},
 	cache: {
 		// Use localStorage to persist cache across sessions
