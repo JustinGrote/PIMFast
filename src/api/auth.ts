@@ -231,7 +231,7 @@ export async function logout(account: AccountInfo) {
 	})
 }
 
-export async function getAllAccounts(): Promise<AccountInfo[]> {
+export function getAllAccounts(): AccountInfo[] {
 	return client.getAllAccounts() ?? []
 }
 
