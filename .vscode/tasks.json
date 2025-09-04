@@ -26,8 +26,8 @@
           },
           "background": {
             "activeOnStart": true,
-            "beginsPattern": "vite",
-            "endsPattern": "VITE .+?ready"
+            "beginsPattern": "> vite",
+            "endsPattern": "CRXJS: Load .+? as unpacked extension"
           }
         }
       ]
