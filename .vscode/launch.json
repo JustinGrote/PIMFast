@@ -8,13 +8,15 @@
       "type": "chrome",
       "request": "launch",
       "name": "Chrome Extension Debug",
-      "runtimeArgs": ["--load-extension=${workspaceFolder}/dist"]
+      "runtimeArgs": ["--load-extension=${workspaceFolder}/dist"],
+      "preLaunchTask": "Vite Dev"
     },
     {
       "type": "msedge",
       "request": "launch",
       "name": "Edge Extension Debug",
-      "runtimeArgs": ["--load-extension=${workspaceFolder}/dist"]
+      "runtimeArgs": ["--load-extension=${workspaceFolder}/dist"],
+      "preLaunchTask": "Vite Dev"
     }
   ]
 }

@@ -2,17 +2,35 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"type": "npm",
-			"script": "dev",
-			"label": "Vite Dev",
-			"detail": "vite",
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
-			"icon": {
-				"color": "terminal.ansiCyan"
-			}
-		}
+      "type": "npm",
+      "script": "dev",
+      "label": "Vite Dev",
+      "detail": "vite",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "icon": {
+        "color": "terminal.ansiCyan"
+      },
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "owner": "vite",
+          "pattern": {
+            "regexp": "xxx(x)(x)(x)",
+            "file": 1,
+            "line": 2,
+            "code": 3,
+            "message": 4
+          },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "vite",
+            "endsPattern": "VITE .+?ready"
+          }
+        }
+      ]
+    }
 	]
 }

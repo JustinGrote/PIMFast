@@ -382,7 +382,9 @@ function RoleTable() {
 				{selectedRole && (
 					<RoleActivationForm
 						eligibleRole={selectedRole}
-						onSuccess={closeActivationModal}
+						onSuccess={activatedRole => {
+							closeActivationModal()
+						}}
 					/>
 				)}
 			</Modal>
