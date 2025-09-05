@@ -146,7 +146,7 @@ function RoleTable() {
 				resizable: true,
 			},
 			{
-				headerName: 'Expires',
+				headerName: 'Status',
 				cellRenderer: (params: { data: EligibleRole }) => {
 					const isActivated = isEligibleRoleActivated(params.data)
 					const roleStatus = roleStatusQuery.data?.[params.data.id]
@@ -360,7 +360,7 @@ function RoleTable() {
 							getRowStyle={getRowStyle}
 							domLayout="normal"
 							suppressHorizontalScroll={false}
-							rowSelection="single"
+							rowSelection={{ mode: 'singleRow' }}
 							defaultColDef={{
 								sortable: true,
 								filter: true,

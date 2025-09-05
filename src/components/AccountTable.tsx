@@ -11,7 +11,7 @@ import ResolvedTenantName from './ResolvedTenantName'
 
 export default function AccountTable() {
 	const {
-		data: accounts = [],
+		data: accounts,
 		isLoading,
 		refetch,
 	} = useQuery({
