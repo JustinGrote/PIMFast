@@ -113,15 +113,13 @@ export interface EligibleRoleActivationRequest extends RoleAssignmentScheduleReq
 
 import {
 	CommonRoleActivateRequest,
+	fromArmRoleAssignmentScheduleRequest,
+	fromEntraRoleAssignmentScheduleRequest,
+	fromGroupRoleAssignmentScheduleRequest,
 	toArmRoleAssignmentScheduleRequest,
 	toEntraRoleAssignmentScheduleRequest,
 	toGroupRoleAssignmentScheduleRequest,
 } from '@/model/CommonRoleActivateRequest'
-import {
-	fromArmAssignment,
-	fromGraphAssignment,
-	fromGroupAssignment,
-} from '@/model/CommonRoleAssignmentScheduleInstance'
 import {
 	createEntraGroupAssignmentScheduleRequest,
 	createEntraRoleAssignmentScheduleRequest,
@@ -129,7 +127,7 @@ import {
 	deactivateEntraRoleAssignmentScheduleRequest,
 } from './pimGraph'
 
-export async function activateEligibleRole(account: AccountInfo, request: CommonRoleActivateRequest) {
+export async function activateEligibleRole(account: AccountInfoOrId, request: CommonRoleActivateRequest) {
 	return await match(request)
 		// ARM-based role activation (Azure Resource roles)
 		.with({ sourceType: 'arm' }, async req => {
@@ -141,7 +139,7 @@ export async function activateEligibleRole(account: AccountInfo, request: Common
 			if (!result) {
 				throw new Error('Activating Role completed but no object was returned. This is a bug.')
 			}
-			return fromArmAssignment(result)
+			return fromArmRoleAssignmentScheduleRequest(result)
 		})
 		// Entra ID directory role activation
 		.with({ sourceType: 'graph' }, async req => {
@@ -149,11 +147,7 @@ export async function activateEligibleRole(account: AccountInfo, request: Common
 			if (!result) {
 				throw new Error('Activating Role completed but no object was returned. This is a bug.')
 			}
-			return fromGraphAssignment({
-				id: result.id!,
-				principalId: result.principalId!,
-				roleDefinitionId: result.roleDefinitionId!,
-			})
+			return fromEntraRoleAssignmentScheduleRequest(result)
 		})
 		// Group role activation
 		.with({ sourceType: 'group' }, async req => {
@@ -161,12 +155,7 @@ export async function activateEligibleRole(account: AccountInfo, request: Common
 			if (!result) {
 				throw new Error('Activating Role completed but no object was returned. This is a bug.')
 			}
-			return fromGroupAssignment({
-				id: result.id!,
-				principalId: result.principalId!,
-				groupId: result.groupId!,
-				accessId: result.accessId!,
-			})
+			return fromGroupRoleAssignmentScheduleRequest(result)
 		})
 		.otherwise(() => {
 			throw new Error('Invalid activation request type')

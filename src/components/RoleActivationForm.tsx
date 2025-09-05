@@ -120,7 +120,7 @@ export function RoleActivationForm({
 	const activationMutation = useMutation({
 		mutationKey: ['activateRole', eligibleRole.schedule.id],
 		mutationFn: async (activationRequest: CommonRoleActivateRequest) =>
-			await activateEligibleRole(eligibleRole.account, activationRequest),
+			await activateEligibleRole(eligibleRole.accountId, activationRequest),
 		onSuccess: result => {
 			console.debug(`Submitted Activation Request ${result.id} for role ${result.roleDefinitionId}`)
 			if (onActivateRoleSuccess) onActivateRoleSuccess(result)
@@ -150,7 +150,7 @@ export function RoleActivationForm({
 
 	function newActivationRequest(
 		{ durationMinutes, justification, startTime, ticketNumber }: FormValues,
-		{ account, schedule }: EligibleRole = eligibleRole,
+		{ schedule }: EligibleRole = eligibleRole,
 	): CommonRoleActivateRequest {
 		return {
 			requestType: 'SelfActivate',
@@ -160,8 +160,8 @@ export function RoleActivationForm({
 			justification,
 			ticketInfo: ticketNumber ? { ticketNumber } : undefined,
 			linkedRoleEligibilityScheduleId: schedule.id,
-			principalId: account.localAccountId,
-			roleDefinitionId: schedule.roleDefinitionId ?? throwError('Role definition ID is required'),
+			principalId: schedule.principalId,
+			roleDefinitionId: schedule.roleDefinitionId,
 			startDateTime: startTime || new Date(),
 			duration: durationMinutes,
 		}

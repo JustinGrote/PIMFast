@@ -111,3 +111,80 @@ export const toGroupRoleAssignmentScheduleRequest = (
 	},
 	justification: common.justification,
 })
+
+/**
+ * Converts an Azure ARM RoleAssignmentScheduleRequest to CommonRoleActivateRequest
+ */
+export const fromArmRoleAssignmentScheduleRequest = (arm: RoleAssignmentScheduleRequest): CommonRoleActivateRequest => {
+	// Extract duration from ISO 8601 duration string
+	const durationMinutes = arm.scheduleInfo?.expiration?.duration
+		? dayjs.duration(arm.scheduleInfo.expiration.duration).asMinutes()
+		: 480 // Default to 8 hours if not specified
+
+	return {
+		id: arm.id || '',
+		scope: arm.scope || '',
+		roleDefinitionId: arm.roleDefinitionId || '',
+		principalId: arm.principalId || '',
+		justification: arm.justification,
+		ticketInfo: arm.ticketInfo,
+		startDateTime: arm.scheduleInfo?.startDateTime,
+		duration: durationMinutes,
+		requestType: arm.requestType || 'SelfActivate',
+		linkedRoleEligibilityScheduleId: arm.linkedRoleEligibilityScheduleId,
+		sourceType: 'arm',
+	}
+}
+
+/**
+ * Converts a Microsoft Graph UnifiedRoleAssignmentScheduleRequest to CommonRoleActivateRequest
+ */
+export const fromEntraRoleAssignmentScheduleRequest = (
+	graph: UnifiedRoleAssignmentScheduleRequest,
+): CommonRoleActivateRequest => {
+	// Extract duration from Duration object
+	const durationMinutes = graph.scheduleInfo?.expiration?.duration?.minutes || 480 // Default to 8 hours
+
+	return {
+		id: graph.id || '',
+		scope: graph.directoryScopeId || '/',
+		roleDefinitionId: graph.roleDefinitionId || '',
+		principalId: graph.principalId || '',
+		justification: graph.justification || undefined,
+		ticketInfo: graph.ticketInfo ? { ticketNumber: graph.ticketInfo.ticketNumber || undefined } : undefined,
+		startDateTime: graph.scheduleInfo?.startDateTime || undefined,
+		duration: durationMinutes,
+		requestType: graph.action || 'selfActivate',
+		sourceType: 'graph',
+	}
+}
+
+/**
+ * Converts a Microsoft Graph PrivilegedAccessGroupAssignmentScheduleRequest to CommonRoleActivateRequest
+ */
+export const fromGroupRoleAssignmentScheduleRequest = (
+	group: PrivilegedAccessGroupAssignmentScheduleRequest,
+): CommonRoleActivateRequest => {
+	// Calculate duration from start and end times
+	let durationMinutes = 480 // Default to 8 hours
+
+	if (group.scheduleInfo?.startDateTime && group.scheduleInfo?.expiration?.endDateTime) {
+		durationMinutes = dayjs(group.scheduleInfo.expiration.endDateTime).diff(
+			dayjs(group.scheduleInfo.startDateTime),
+			'minutes',
+		)
+	}
+
+	return {
+		id: group.id || '',
+		scope: group.groupId || '',
+		roleDefinitionId: group.accessId || 'member',
+		principalId: group.principalId || '',
+		justification: group.justification || undefined,
+		ticketInfo: group.ticketInfo ? { ticketNumber: group.ticketInfo.ticketNumber || undefined } : undefined,
+		startDateTime: group.scheduleInfo?.startDateTime || undefined,
+		duration: durationMinutes,
+		requestType: group.action || 'selfActivate',
+		sourceType: 'group',
+	}
+}
