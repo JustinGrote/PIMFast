@@ -206,7 +206,7 @@ export const client = new PublicClientApplication({
 			loggerCallback: (level, message) => {
 				console.log(`[MSAL] ${level}: ${message}`)
 			},
-			logLevel: LogLevel.Info,
+			logLevel: LogLevel.Warning,
 			piiLoggingEnabled: true,
 		},
 		// allowNativeBroker: true,
@@ -224,15 +224,32 @@ await client.initialize()
 
 export const hasAuthenticatedAccounts = () => client.getAllAccounts().length > 0
 
-export async function logout(account: AccountInfo) {
+export async function logout(accountId: AccountInfoUniqueId) {
 	// TODO: Use the logout URI functionality so a logout is recorded in Azure. This is tricky in an extension though.
 	await client.clearCache({
-		account: account,
+		account: getAccountByLocalId(accountId),
 	})
 }
 
 export function getAllAccounts(): AccountInfo[] {
 	return client.getAllAccounts() ?? []
+}
+
+export const getAllAccountLocalIds = (): AccountInfoUniqueId[] =>
+	getAllAccounts().map(account => account.localAccountId)
+
+/**
+ * Gets an account by its local ID.
+ * @param localId - The local account ID to search for.
+ * @returns The account info if found.
+ * @throws If no account with the given local ID is found.
+ */
+export const getAccountByLocalId = (localId: AccountInfoUniqueId): AccountInfo => {
+	const account = client.getAllAccounts().find(acc => acc.localAccountId === localId)
+	if (!account) {
+		throwError(`Account with local ID '${localId}' not found.`)
+	}
+	return account
 }
 
 /** A TokenCredential bridge between MSAL.js and the Azure SDK */

@@ -1,4 +1,4 @@
-import { EligibleRole } from '@/model/EligibleRole'
+import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole'
 import {
 	AuthorizationManagementClient,
 	RoleAssignmentScheduleInstance,
@@ -7,7 +7,7 @@ import {
 } from '@azure/arm-authorization'
 import { AccountInfo } from '@azure/msal-browser'
 import { match } from 'ts-pattern'
-import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
+import { AccountInfoHomeId, AccountInfoTokenCredential, AccountInfoUniqueId, getAccountByLocalId } from './auth'
 import { throwError } from './util'
 
 // Scoping to subscription is not needed for the client as we will do it in our requests
@@ -20,12 +20,14 @@ const pimClients: Map<AccountInfoHomeId, AuthorizationManagementClient> = new Ma
  * Returns a singleton AuthorizationManagementClient for the app per best practice
  * @param account The account info.
  */
-function getPimClient(account: AccountInfo) {
-	const cacheKey = account.homeAccountId
-	let client: AuthorizationManagementClient | undefined = pimClients.get(cacheKey)
+function getPimClient(account: AccountInfo | AccountInfoUniqueId) {
+	const localId = typeof account === 'string' ? account : account.localAccountId
+	let client: AuthorizationManagementClient | undefined = pimClients.get(localId)
 	if (!client) {
-		client = new AuthorizationManagementClient(new AccountInfoTokenCredential(account), UNSPECIFIED_SUBSCRIPTION_ID)
-		pimClients.set(cacheKey, client)
+		const account = getAccountByLocalId(localId)
+		const tokenCredential = new AccountInfoTokenCredential(account)
+		client = new AuthorizationManagementClient(tokenCredential, UNSPECIFIED_SUBSCRIPTION_ID)
+		pimClients.set(localId, client)
 	}
 	return client
 }
@@ -172,8 +174,8 @@ export async function activateEligibleRole(account: AccountInfo, request: Common
 }
 
 export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
-	const { account, schedule } = eligibleRole
-	const client = getPimClient(account)
+	const { accountId, schedule } = eligibleRole
+	const client = getPimClient(accountId)
 
 	// For ARM-based schedules, we need the original schedule
 	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
@@ -182,7 +184,7 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 		if (!armSchedule.id) throwError('id doesnt exist')
 		return await client.roleAssignmentScheduleRequests.create(armSchedule.scope, crypto.randomUUID(), {
 			requestType: 'SelfDeactivate',
-			principalId: account.localAccountId,
+			principalId: accountId,
 			roleDefinitionId: armSchedule.roleDefinitionId,
 		})
 	} else if (schedule.sourceType === 'graph' && schedule.originalSchedule) {
@@ -200,8 +202,8 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 
 /** Check a role status by fetching its request and seeing if it links back to the schedule */
 export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
-	const { account, schedule } = eligibleRole
-	const client = getPimClient(account)
+	const { accountId, schedule } = eligibleRole
+	const client = getPimClient(accountId)
 
 	// For ARM-based schedules, we need the original schedule
 	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
@@ -223,18 +225,18 @@ export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
 	}
 }
 
-export const getMyRoleEligibilitySchedules = (account: AccountInfo, scope: string = '') =>
+export const getMyRoleEligibilitySchedules = (account: AccountInfoOrId, scope: string = '') =>
 	getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: MY_ROLES_ONLY })
 
 /** Roles that can currently be activated right now */
-export const getMyRoleEligibilityScheduleInstances = (account: AccountInfo, scope: string = '') =>
+export const getMyRoleEligibilityScheduleInstances = (account: AccountInfoOrId, scope: string = '') =>
 	getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
 
 /** Roles that are either eligible activated or assigned */
-export const getMyRoleAssignmentScheduleInstances = (account: AccountInfo, scope: string = '') =>
+export const getMyRoleAssignmentScheduleInstances = (account: AccountInfoOrId, scope: string = '') =>
 	getPimClient(account).roleAssignmentScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
 
-export const getMyRoleAssignmentScheduleRequests = (account: AccountInfo, scope: string = '') =>
+export const getMyRoleAssignmentScheduleRequests = (account: AccountInfoOrId, scope: string = '') =>
 	getPimClient(account).roleAssignmentScheduleRequests.listForScope(scope, { filter: MY_ROLES_ONLY })
 
 export const filterActivatedRoles = (assignment: RoleAssignmentScheduleInstance[]) =>

@@ -1,26 +1,14 @@
+import { getAccountByLocalId } from '@/api/auth'
 import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/api/azureResourceId'
 import { throwIfNotError } from '@/api/util'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { EligibleRole } from '@/model/EligibleRole'
-import {
-	ActionIcon,
-	Button,
-	Center,
-	Group,
-	LoadingOverlay,
-	Modal,
-	Paper,
-	Skeleton,
-	Stack,
-	Text,
-	TextInput,
-	Title,
-} from '@mantine/core'
+import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
-import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
+import { ColDef, GridApi, GridReadyEvent, RowClassParams } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
@@ -28,7 +16,6 @@ import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
-import ResolvedTenantName from './ResolvedTenantName'
 import { useRoleTableQueries } from './RoleTable.query'
 
 dayjs.extend(durationPlugin)
@@ -43,7 +30,6 @@ function RoleTable() {
 	const [filterQuery, setFilterQuery] = useState('')
 
 	const {
-		accountsQuery,
 		currentTab,
 		eligibleRolesQuery,
 		roleStatusQuery,
@@ -115,41 +101,41 @@ function RoleTable() {
 				resizable: true,
 				valueGetter: params => params.data?.schedule.scopeDisplayName || '',
 			},
-			{
-				field: 'account.name',
-				headerName: 'Account',
-				cellRenderer: (params: { data: EligibleRole }) => (
-					<Text
-						size="sm"
-						title={params.data.account.username}
-					>
-						{params.data.account.name ?? params.data.account.username}
-					</Text>
-				),
-				flex: 1,
-				sortable: true,
-				resizable: true,
-				hide: accountsQuery.data && accountsQuery.data.length <= 1,
-			},
-			{
-				headerName: 'Tenant',
-				cellRenderer: (params: { data: EligibleRole }) => (
-					<ResolvedTenantName
-						account={params.data.account}
-						roleOrTenantId={
-							['group', 'graph'].includes(params.data.schedule.sourceType) ? params.data.account.tenantId : params.data
-						}
-					/>
-				),
-				flex: 1,
-				sortable: false,
-				resizable: true,
-			},
+			// {
+			// 	field: 'account.name',
+			// 	headerName: 'Account',
+			// 	cellRenderer: (params: { data: EligibleRole }) => (
+			// 		<Text
+			// 			size="sm"
+			// 			title={params.data.account.username}
+			// 		>
+			// 			{params.data.account.name ?? params.data.account.username}
+			// 		</Text>
+			// 	),
+			// 	flex: 1,
+			// 	sortable: true,
+			// 	resizable: true,
+			// 	hide: accountsQuery.data && accountsQuery.data.length <= 1,
+			// },
+			// {
+			// 	headerName: 'Tenant',
+			// 	cellRenderer: (params: { data: EligibleRole }) => (
+			// 		<ResolvedTenantName
+			// 			account={params.data.account}
+			// 			roleOrTenantId={
+			// 				['group', 'graph'].includes(params.data.schedule.sourceType) ? params.data.account.tenantId : params.data
+			// 			}
+			// 		/>
+			// 	),
+			// 	flex: 1,
+			// 	sortable: false,
+			// 	resizable: true,
+			// },
 			{
 				headerName: 'Status',
 				cellRenderer: (params: { data: EligibleRole }) => {
 					const isActivated = isEligibleRoleActivated(params.data)
-					const roleStatus = roleStatusQuery.data?.[params.data.id]
+					const roleStatus = roleStatusQuery.data?.[params.data.accountId]
 
 					if (isActivated && roleStatus?.endDateTime) {
 						return (
@@ -235,7 +221,7 @@ function RoleTable() {
 				resizable: false,
 			},
 		],
-		[roleStatusQuery.isSuccess, accountsQuery.data, currentTab, isEligibleRoleActivated, isEligibleRoleNewlyActivated],
+		[roleStatusQuery.isSuccess, currentTab, isEligibleRoleActivated, isEligibleRoleNewlyActivated],
 	)
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
@@ -255,7 +241,7 @@ function RoleTable() {
 		if (filterQuery) {
 			const lowerQuery = filterQuery.toLowerCase()
 			filtered = filtered.filter(role => {
-				const accountName = role.account.name?.toLowerCase() || ''
+				const accountName = getAccountByLocalId(role.accountId).name?.toLowerCase() || ''
 				const roleName = role.schedule.roleDefinitionDisplayName?.toLowerCase() || ''
 				const scopeName = role.schedule.scopeDisplayName?.toLowerCase() || ''
 				// TODO: Fix tenant search
@@ -274,7 +260,7 @@ function RoleTable() {
 		setGridApi(params.api)
 	}
 
-	const getRowStyle = (params: { data: EligibleRole }) => {
+	const getRowStyle = (params: RowClassParams<EligibleRole>) => {
 		if (!currentTab?.url || !params.data) {
 			return undefined
 		}
@@ -345,22 +331,16 @@ function RoleTable() {
 					/>
 
 					<div style={{ height: 'calc(100vh - 200px)', width: '100%', position: 'relative', minHeight: '400px' }}>
-						<LoadingOverlay
-							visible={eligibleRolesQuery.isLoading || eligibleRolesQuery.isFetching}
-							zIndex={1000}
-							overlayProps={{ radius: 'sm', blur: 2 }}
-						></LoadingOverlay>
-						<MantineAgGridReact
+						<MantineAgGridReact<EligibleRole>
 							className="roleTable"
+							loading={eligibleRolesQuery.isFetching}
 							rowData={filteredRoles}
 							columnDefs={columnDefs}
-							loading={eligibleRolesQuery.isFetching}
-							getRowId={params => params.data.id}
+							getRowId={params => params.data.schedule.id}
 							onGridReady={onGridReady}
 							getRowStyle={getRowStyle}
 							domLayout="normal"
-							suppressHorizontalScroll={false}
-							rowSelection={{ mode: 'singleRow' }}
+							rowSelection={{ mode: 'singleRow', checkboxes: false }}
 							defaultColDef={{
 								sortable: true,
 								filter: true,
@@ -368,7 +348,6 @@ function RoleTable() {
 							}}
 							key={roleStatusQuery.isSuccess ? 'success' : 'loading'}
 						/>
-						<LoadingOverlay />
 					</div>
 				</Stack>
 			</Paper>

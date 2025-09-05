@@ -1,9 +1,9 @@
-import { getAllAccounts, logout } from '@/api/auth'
-import { AccountInfo } from '@azure/msal-browser'
+import { AccountInfoUniqueId, getAllAccounts, logout } from '@/api/auth'
+import { AccountInfoDisplay } from '@/model/EligibleRole'
 import { ActionIcon, Group, LoadingOverlay, Tooltip } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconX } from '@tabler/icons-react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { ColDef } from 'ag-grid-community'
 import { useMemo } from 'react'
 import MantineAgGridReact from './MantineAgGridReact'
@@ -14,16 +14,25 @@ export default function AccountTable() {
 		data: accounts,
 		isLoading,
 		refetch,
-	} = useQuery({
+	} = useSuspenseQuery<AccountInfoDisplay[]>({
 		queryKey: ['pim', 'accounts'],
 		queryFn: getAllAccounts,
+		// We do this reduction to avoid unnecessary re-renders when the access token is updated. It's also private info we don't need to expose
+		select: data =>
+			data.map(account => ({
+				name: account.name,
+				username: account.username,
+				tenantId: account.tenantId,
+				homeAccountId: account.homeAccountId,
+				localAccountId: account.localAccountId,
+			})),
 	})
 
 	const { mutate: logoutAccount, isPending } = useMutation({
 		mutationKey: ['signOut'],
-		mutationFn: async (account: AccountInfo) => {
-			console.log(`Signing out account: ${account.username}`)
-			await logout(account)
+		mutationFn: async (accountId: AccountInfoUniqueId) => {
+			console.log(`Signing out account: ${accountId}`)
+			await logout(accountId)
 		},
 		onSuccess: () => {
 			refetch()
@@ -37,9 +46,9 @@ export default function AccountTable() {
 		},
 	})
 
-	const handleSignOutAccount = (account: AccountInfo) => logoutAccount(account)
+	const handleSignOutAccount = (accountId: AccountInfoUniqueId) => logoutAccount(accountId)
 
-	const columnDefs: ColDef<AccountInfo>[] = useMemo(
+	const columnDefs: ColDef<AccountInfoDisplay>[] = useMemo(
 		() => [
 			{
 				field: 'name',
@@ -55,7 +64,7 @@ export default function AccountTable() {
 			{
 				field: 'tenantId',
 				headerName: 'Tenant ID',
-				cellRenderer: (params: { data: AccountInfo }) => (
+				cellRenderer: (params: { data: AccountInfoDisplay }) => (
 					<ResolvedTenantName
 						account={params.data}
 						roleOrTenantId={params.data.tenantId}
@@ -65,7 +74,7 @@ export default function AccountTable() {
 			},
 			{
 				headerName: '',
-				cellRenderer: (params: { data: AccountInfo }) => (
+				cellRenderer: (params: { data: AccountInfoDisplay }) => (
 					<Group
 						gap="xs"
 						justify="flex-end"
@@ -75,7 +84,7 @@ export default function AccountTable() {
 								color="red"
 								variant="subtle"
 								loading={isPending}
-								onClick={() => handleSignOutAccount(params.data)}
+								onClick={() => handleSignOutAccount(params.data.localAccountId)}
 							>
 								<IconX size={16} />
 							</ActionIcon>
@@ -102,10 +111,12 @@ export default function AccountTable() {
 				rowData={accounts}
 				columnDefs={columnDefs}
 				loading={isLoading}
-				getRowId={params => params.data.homeAccountId}
+				getRowId={params => params.data.localAccountId}
 				domLayout="autoHeight"
 				suppressHorizontalScroll={false}
-				rowSelection="single"
+				rowSelection={{
+					mode: 'singleRow',
+				}}
 			/>
 		</div>
 	)

@@ -8,7 +8,7 @@
 }
 
 /* Azure Portal specific AG Grid styling */
-.mantineAgGrid {
+/* .mantineAgGrid {
 	--ag-background-color: auto;
 	--ag-odd-row-background-color: #252526;
 	--ag-border-color: #3c3c3c;
@@ -21,7 +21,7 @@
 	--ag-header-height: 32px;
 	--ag-row-height: 28px;
 	font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-}
+} */
 
 .mantineAgGrid .ag-header-cell {
 	font-weight: 600;

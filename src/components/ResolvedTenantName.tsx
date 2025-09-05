@@ -1,3 +1,4 @@
+import { getAccountByLocalId } from '@/api/auth'
 import {
 	ChildResourceId,
 	ManagementGroupId,
@@ -9,7 +10,7 @@ import {
 } from '@/api/azureResourceId'
 import { fetchManagementGroup } from '@/api/managementGroups'
 import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
-import { EligibleRole } from '@/model/EligibleRole'
+import { AccountInfoDisplay, EligibleRole } from '@/model/EligibleRole'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
@@ -24,12 +25,12 @@ export default function ResolvedTenantName({
 	// The ID of the role or tenant. If unspecified, it will be derived from the AccountInfo
 	roleOrTenantId = account.tenantId,
 }: {
-	account: AccountInfo
+	account: AccountInfoDisplay
 	roleOrTenantId?: EligibleRole | string
 }) {
 	const { data: tenants } = useQuery<TenantIdDescription[]>({
-		queryKey: ['tenants', account.homeAccountId],
-		queryFn: async () => fetchTenants(account),
+		queryKey: ['tenants', account.localAccountId],
+		queryFn: async () => fetchTenants(getAccountByLocalId(account.localAccountId)),
 	})
 
 	const { data: tenantInfo, isFetching } = useQuery<TenantIdDescription>({
@@ -41,7 +42,7 @@ export default function ResolvedTenantName({
 					// Get the tenant Id from the eligible role
 					const scope = roleOrTenantId.schedule.scope
 					if (!scope) throw new Error('Role doesnt have a scope. This should not happen')
-					const fetchResult = await fetchTenantIdFromResourceId(account, scope)
+					const fetchResult = await fetchTenantIdFromResourceId(getAccountByLocalId(account.localAccountId), scope)
 					tenantId = fetchResult ?? throwUser(`Failed to retrieve tenant ID for scope ${scope}`)
 				} else {
 					tenantId = roleOrTenantId
@@ -53,9 +54,9 @@ export default function ResolvedTenantName({
 				}
 
 				// This path happens if the tenant is not found in the initial list and is probably a non-home tenant
-				const tenantInfo = await findTenantInformation(account, tenantId)
+				const tenantInfo = await findTenantInformation(getAccountByLocalId(account.localAccountId), tenantId)
 				if (!tenantInfo) {
-					throw 'Failed to retrieve tenant information for tenantId: ' + tenantId
+					throw new Error('Failed to retrieve tenant information for tenantId: ' + tenantId)
 				}
 
 				// Adapt the return value to match the expected structure

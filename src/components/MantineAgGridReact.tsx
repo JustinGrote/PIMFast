@@ -12,7 +12,7 @@ ModuleRegistry.registerModules([AllCommunityModule])
  * A pre-themed AG Grid React component that automatically integrates with the current Mantine theme.
  * Switches between light and dark themes based on the Mantine color scheme.
  */
-export default function MantineAgGridReact({ ...agGridProps }: AgGridReactProps) {
+export default function MantineAgGridReact<T>({ ...agGridProps }: AgGridReactProps<T>) {
 	const currentColorScheme = useComputedColorScheme()
 
 	// Determine the AG Grid theme class based on the Mantine color scheme
