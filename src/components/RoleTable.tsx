@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
+import ResolvedTenantName from './ResolvedTenantName'
 import { useRoleTableQueries } from './RoleTable.query'
 
 dayjs.extend(durationPlugin)
@@ -30,6 +31,7 @@ function RoleTable() {
 	const [filterQuery, setFilterQuery] = useState('')
 
 	const {
+		accountIds,
 		currentTab,
 		eligibleRolesQuery,
 		roleStatusQuery,
@@ -101,36 +103,44 @@ function RoleTable() {
 				resizable: true,
 				valueGetter: params => params.data?.schedule.scopeDisplayName || '',
 			},
-			// {
-			// 	field: 'account.name',
-			// 	headerName: 'Account',
-			// 	cellRenderer: (params: { data: EligibleRole }) => (
-			// 		<Text
-			// 			size="sm"
-			// 			title={params.data.account.username}
-			// 		>
-			// 			{params.data.account.name ?? params.data.account.username}
-			// 		</Text>
-			// 	),
-			// 	flex: 1,
-			// 	sortable: true,
-			// 	resizable: true,
-			// 	hide: accountsQuery.data && accountsQuery.data.length <= 1,
-			// },
-			// {
-			// 	headerName: 'Tenant',
-			// 	cellRenderer: (params: { data: EligibleRole }) => (
-			// 		<ResolvedTenantName
-			// 			account={params.data.account}
-			// 			roleOrTenantId={
-			// 				['group', 'graph'].includes(params.data.schedule.sourceType) ? params.data.account.tenantId : params.data
-			// 			}
-			// 		/>
-			// 	),
-			// 	flex: 1,
-			// 	sortable: false,
-			// 	resizable: true,
-			// },
+			{
+				headerName: 'Account',
+				cellRenderer: (params: { data: EligibleRole }) => {
+					const { name, username } = getAccountByLocalId(params.data.accountId)
+					return (
+						<Text
+							size="sm"
+							title={name}
+						>
+							{username}
+						</Text>
+					)
+				},
+				flex: 1,
+				sortable: true,
+				resizable: true,
+				hide: accountIds.length <= 1,
+				valueGetter: params => {
+					if (!params.data?.accountId) {
+						return ''
+					}
+					return getAccountByLocalId(params.data.accountId).name
+				},
+			},
+			{
+				headerName: 'Tenant',
+				cellRenderer: (params: { data: EligibleRole }) => (
+					<ResolvedTenantName
+						account={params.data.accountId}
+						roleOrTenantId={
+							['group', 'graph'].includes(params.data.schedule.sourceType) ? params.data : params.data.accountId
+						}
+					/>
+				),
+				flex: 1,
+				sortable: false,
+				resizable: true,
+			},
 			{
 				headerName: 'Status',
 				cellRenderer: (params: { data: EligibleRole }) => {
@@ -341,6 +351,7 @@ function RoleTable() {
 							getRowStyle={getRowStyle}
 							domLayout="normal"
 							rowSelection={{ mode: 'singleRow', checkboxes: false }}
+							animateRows={false}
 							defaultColDef={{
 								sortable: true,
 								filter: true,

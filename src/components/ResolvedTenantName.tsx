@@ -10,7 +10,7 @@ import {
 } from '@/api/azureResourceId'
 import { fetchManagementGroup } from '@/api/managementGroups'
 import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
-import { AccountInfoDisplay, EligibleRole } from '@/model/EligibleRole'
+import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
@@ -22,63 +22,69 @@ import { match, P } from 'ts-pattern'
  */
 export default function ResolvedTenantName({
 	account,
-	// The ID of the role or tenant. If unspecified, it will be derived from the AccountInfo
-	roleOrTenantId = account.tenantId,
+	roleOrTenantId,
 }: {
-	account: AccountInfoDisplay
+	account: AccountInfoOrId
 	roleOrTenantId?: EligibleRole | string
 }) {
+	account = typeof account === 'string' ? getAccountByLocalId(account) : account
 	const { data: tenants } = useQuery<TenantIdDescription[]>({
+		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['tenants', account.localAccountId],
-		queryFn: async () => fetchTenants(getAccountByLocalId(account.localAccountId)),
+		queryFn: async () => fetchTenants(account),
 	})
 
 	const { data: tenantInfo, isFetching } = useQuery<TenantIdDescription>({
-		queryKey: ['tenants', 'tenantInfo', roleOrTenantId, tenants],
+		// eslint-disable-next-line @tanstack/query/exhaustive-deps
+		queryKey: ['tenants', 'tenantInfo', account.tenantId, roleOrTenantId],
 		queryFn: async () => {
 			let tenantId: string
-			try {
-				if (typeof roleOrTenantId !== 'string') {
+			if (roleOrTenantId === undefined) {
+				tenantId = account.tenantId
+			} else if (typeof roleOrTenantId === 'string') {
+				tenantId = roleOrTenantId
+			} else {
+				try {
 					// Get the tenant Id from the eligible role
 					const scope = roleOrTenantId.schedule.scope
-					if (!scope) throw new Error('Role doesnt have a scope. This should not happen')
-					const fetchResult = await fetchTenantIdFromResourceId(getAccountByLocalId(account.localAccountId), scope)
+					const fetchResult = await fetchTenantIdFromResourceId(account, scope)
 					tenantId = fetchResult ?? throwUser(`Failed to retrieve tenant ID for scope ${scope}`)
-				} else {
-					tenantId = roleOrTenantId
+				} catch (err: unknown) {
+					const errMessage = match(err)
+						.with(P.instanceOf(FetchTenantSubscriptionNotFoundError), () => {
+							return '[Unknown] - No Read Access to Scope'
+						})
+						.otherwise(() => {
+							return '[Unknown] - Failed to Retrieve Tenant Information'
+						})
+					return {
+						id: '/tenants/unknown',
+						tenantId: 'unknown',
+						displayName: errMessage,
+						defaultDomain: errMessage,
+						domains: [errMessage],
+					}
 				}
+			}
 
-				const tenant = tenants!.find(({ tenantId: id }) => id === tenantId)
-				if (tenant) {
-					return tenant
-				}
+			// Now fetch the tenant info using tenantId
+			const tenant = tenants!.find(({ tenantId: id }) => id === tenantId)
+			if (tenant) {
+				return tenant
+			}
 
-				// This path happens if the tenant is not found in the initial list and is probably a non-home tenant
-				const tenantInfo = await findTenantInformation(getAccountByLocalId(account.localAccountId), tenantId)
-				if (!tenantInfo) {
-					throw new Error('Failed to retrieve tenant information for tenantId: ' + tenantId)
-				}
-
-				// Adapt the return value to match the expected structure
-				return {
-					id: '/tenants/' + tenantId,
-					tenantId: tenantId,
-					displayName: tenantInfo.federationBrandName || tenantInfo.displayName || 'Unknown',
-					defaultDomain: tenantInfo.defaultDomainName || 'Unknown',
-					domains: [tenantInfo.defaultDomainName],
-				}
-			} catch (err: unknown) {
-				const errMessage = match(err)
-					.with(P.instanceOf(FetchTenantSubscriptionNotFoundError), () => {
-						return '[Unknown] - No Read Access to Scope'
-					})
-					.otherwise(() => {
-						return '[Unknown] - Failed to Retrieve Tenant Information'
-					})
-				return {
-					displayName: errMessage,
-					defaultDomain: errMessage,
-				}
+			// This path happens if the tenant is not found in the initial list and is probably a non-home tenant
+			const tenantInfo = await findTenantInformation(getAccountByLocalId(account.localAccountId), tenantId)
+			if (!tenantInfo) {
+				throw new Error('Failed to retrieve tenant information for tenantId: ' + tenantId)
+			}
+			// Adapt the return value to match the expected structure
+			return {
+				id: '/tenants/' + tenantId,
+				tenantId: tenantId,
+				displayName: tenantInfo.federationBrandName || tenantInfo.displayName || 'Unknown',
+				defaultDomain: tenantInfo.defaultDomainName || 'Unknown',
+				domains: [tenantInfo.defaultDomainName],
 			}
 		},
 	})
