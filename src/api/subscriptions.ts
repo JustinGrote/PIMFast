@@ -4,14 +4,14 @@ import { AccountInfoHomeId, AccountInfoTokenCredential } from './auth'
 import { getGraphClient } from './graphClient'
 
 export type TenantInformation = {
-	/** Primary domain name of a Microsoft Entra tenant. */
-	defaultDomainName: string
+	/** Unique identifier of a Microsoft Entra tenant. */
+	tenantId: string
 	/** Display name of a Microsoft Entra tenant. */
 	displayName: string
 	/** Name shown to users that sign in to a Microsoft Entra tenant. */
-	federationBrandName: string
-	/** Unique identifier of a Microsoft Entra tenant. */
-	tenantId: string
+	federationBrandName?: string
+	/** Primary domain name of a Microsoft Entra tenant. */
+	defaultDomainName?: string
 }
 
 const subscriptionClients: Map<AccountInfoHomeId, SubscriptionClient> = new Map()

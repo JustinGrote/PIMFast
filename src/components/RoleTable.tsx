@@ -129,14 +129,7 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Tenant',
-				cellRenderer: (params: { data: EligibleRole }) => (
-					<ResolvedTenantName
-						account={params.data.accountId}
-						roleOrTenantId={
-							['group', 'graph'].includes(params.data.schedule.sourceType) ? params.data : params.data.accountId
-						}
-					/>
-				),
+				cellRenderer: (params: { data: EligibleRole }) => <ResolvedTenantName role={params.data} />,
 				flex: 1,
 				sortable: false,
 				resizable: true,
@@ -270,6 +263,7 @@ function RoleTable() {
 		setGridApi(params.api)
 	}
 
+	/** Highlight roles that match the current resource in the active browser tab */
 	const getRowStyle = (params: RowClassParams<EligibleRole>) => {
 		if (!currentTab?.url || !params.data) {
 			return undefined
@@ -357,7 +351,6 @@ function RoleTable() {
 								filter: true,
 								resizable: true,
 							}}
-							key={roleStatusQuery.isSuccess ? 'success' : 'loading'}
 						/>
 					</div>
 				</Stack>

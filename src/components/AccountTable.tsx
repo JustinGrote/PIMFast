@@ -63,11 +63,12 @@ export default function AccountTable() {
 			},
 			{
 				field: 'tenantId',
-				headerName: 'Tenant ID',
+				headerName: 'Tenant',
 				cellRenderer: (params: { data: AccountInfoDisplay }) => (
 					<ResolvedTenantName
-						account={params.data}
-						roleOrTenantId={params.data.tenantId}
+						role={{
+							accountId: params.data.localAccountId,
+						}}
 					/>
 				),
 				flex: 1,
