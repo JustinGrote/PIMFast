@@ -27,8 +27,9 @@ export default function MantineAgGridReact<T>({ ...agGridProps }: AgGridReactPro
 			...agGridProps,
 			theme: gridTheme,
 			className: `mantineAgGrid ${agGridProps.className || ''}`.trim(),
+			domLayout: 'autoHeight',
 		}),
-		[agGridProps],
+		[agGridProps, gridTheme],
 	)
 
 	return <AgGridReact {...defaultGridOptions} />
