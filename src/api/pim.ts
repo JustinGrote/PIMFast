@@ -1,14 +1,14 @@
-import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole'
+import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole';
 import {
 	AuthorizationManagementClient,
 	RoleAssignmentScheduleInstance,
 	RoleAssignmentScheduleRequest,
-	RoleEligibilityScheduleInstance,
-} from '@azure/arm-authorization'
-import { AccountInfo } from '@azure/msal-browser'
-import { match } from 'ts-pattern'
-import { AccountInfoHomeId, AccountInfoTokenCredential, AccountInfoUniqueId, getAccountByLocalId } from './auth'
-import { throwError } from './util'
+	RoleEligibilitySchedule,
+} from '@azure/arm-authorization';
+import { AccountInfo } from '@azure/msal-browser';
+import { match } from 'ts-pattern';
+import { AccountInfoHomeId, AccountInfoTokenCredential, AccountInfoUniqueId, getAccountByLocalId } from './auth';
+import { throwError } from './util';
 
 // Scoping to subscription is not needed for the client as we will do it in our requests
 const UNSPECIFIED_SUBSCRIPTION_ID = '00000000-0000-0000-0000-000000000000'
@@ -34,7 +34,7 @@ function getPimClient(account: AccountInfo | AccountInfoUniqueId) {
 
 export async function getRoleManagementPolicyAssignments(
 	account: AccountInfo,
-	schedule: RoleEligibilityScheduleInstance,
+	schedule: RoleEligibilitySchedule,
 ) {
 	try {
 		if (!schedule.scope || !schedule.roleDefinitionId) {
@@ -76,7 +76,7 @@ export async function getRoleManagementPolicyAssignments(
 	}
 }
 
-export async function getPolicyRequirements(_account: AccountInfo, _schedule: RoleEligibilityScheduleInstance) {
+export async function getPolicyRequirements(_account: AccountInfo, _schedule: RoleEligibilitySchedule) {
 	// FIXME: Implement policy requirement fetching logic
 	return {
 		requiresJustification: true,
@@ -119,13 +119,13 @@ import {
 	toArmRoleAssignmentScheduleRequest,
 	toEntraRoleAssignmentScheduleRequest,
 	toGroupRoleAssignmentScheduleRequest,
-} from '@/model/CommonRoleActivateRequest'
+} from '@/model/CommonRoleActivateRequest';
 import {
 	createEntraGroupAssignmentScheduleRequest,
 	createEntraRoleAssignmentScheduleRequest,
 	deactivateEntraGroupAssignmentScheduleRequest,
 	deactivateEntraRoleAssignmentScheduleRequest,
-} from './pimGraph'
+} from './pimGraph';
 
 export async function activateEligibleRole(account: AccountInfoOrId, request: CommonRoleActivateRequest) {
 	return await match(request)
@@ -168,7 +168,7 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 
 	// For ARM-based schedules, we need the original schedule
 	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
-		const armSchedule = schedule.originalSchedule as RoleEligibilityScheduleInstance
+		const armSchedule = schedule.originalSchedule as RoleEligibilitySchedule
 		if (!armSchedule.scope) throwError('scope doesnt exist')
 		if (!armSchedule.id) throwError('id doesnt exist')
 		return await client.roleAssignmentScheduleRequests.create(armSchedule.scope, crypto.randomUUID(), {
@@ -196,7 +196,7 @@ export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
 
 	// For ARM-based schedules, we need the original schedule
 	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
-		const armSchedule = schedule.originalSchedule as RoleEligibilityScheduleInstance
+		const armSchedule = schedule.originalSchedule as RoleEligibilitySchedule
 		const scopedAssignments = client.roleAssignmentScheduleInstances.listForScope(
 			armSchedule.scope ?? throwError('Missing schedule scope'),
 			{ filter: MY_ROLES_ONLY },
@@ -218,6 +218,7 @@ export const getMyRoleEligibilitySchedules = (account: AccountInfoOrId, scope: s
 	getPimClient(account).roleEligibilitySchedules.listForScope(scope, { filter: MY_ROLES_ONLY })
 
 /** Roles that can currently be activated right now */
+// Instances no longer used for eligibility; prefer schedules above.
 export const getMyRoleEligibilityScheduleInstances = (account: AccountInfoOrId, scope: string = '') =>
 	getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
 
@@ -233,4 +234,4 @@ export const filterActivatedRoles = (assignment: RoleAssignmentScheduleInstance[
 
 // These types are useful for uniquely identifying these items without using their objects
 export type RoleAssignmentScheduleRequestId = NonNullable<RoleAssignmentScheduleRequest['id']>
-export type RoleEligibilityScheduleInstanceId = NonNullable<RoleEligibilityScheduleInstance['id']>
+export type RoleEligibilityScheduleId = NonNullable<RoleEligibilitySchedule['id']>

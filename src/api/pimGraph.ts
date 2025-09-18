@@ -1,19 +1,19 @@
 import {
 	PrivilegedAccessGroupAssignmentScheduleInstanceExpanded,
 	UnifiedRoleAssignmentScheduleInstanceExpanded,
-} from '@/model/CommonRoleAssignmentScheduleInstance'
-import { PrivilegedAccessGroupEligibilityScheduleInstanceExpanded } from '@/model/CommonRoleSchedule'
-import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole'
-import { AccountInfo } from '@azure/msal-browser'
-import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure'
-import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary'
-import { AccountInfoHomeId, AccountInfoTokenCredential, getAccountByLocalId } from './auth'
+} from '@/model/CommonRoleAssignmentScheduleInstance';
+import { PrivilegedAccessGroupEligibilityScheduleExpanded } from '@/model/CommonRoleSchedule';
+import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole';
+import { AccountInfo } from '@azure/msal-browser';
+import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure';
+import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
+import { AccountInfoHomeId, AccountInfoTokenCredential, getAccountByLocalId } from './auth';
 import {
 	PrivilegedAccessGroupAssignmentScheduleRequest,
 	UnifiedRoleAssignmentScheduleRequest,
-	UnifiedRoleEligibilityScheduleInstance,
-} from './generated/msgraph/models'
-import { createPimGraphClient, PimGraphClient } from './generated/msgraph/pimGraphClient'
+	UnifiedRoleEligibilitySchedule,
+} from './generated/msgraph/models';
+import { createPimGraphClient, PimGraphClient } from './generated/msgraph/pimGraphClient';
 
 const graphPimClients: Record<AccountInfoHomeId, PimGraphClient> = {}
 
@@ -41,7 +41,7 @@ export function getPimClient(account: AccountInfoOrId): PimGraphClient {
 	return client
 }
 
-export interface UnifiedRoleEligibilityScheduleInstanceExpanded extends UnifiedRoleEligibilityScheduleInstance {
+export interface UnifiedRoleEligibilityScheduleExpanded extends UnifiedRoleEligibilitySchedule {
 	roleDefinition: {
 		id: string
 		displayName: string
@@ -61,44 +61,41 @@ export interface UnifiedRoleEligibilityScheduleInstanceExpanded extends UnifiedR
  * @returns A promise that resolves to an array of UnifiedRoleEligibilityScheduleInstance objects.
  * @throws Will throw an error if fetching fails.
  */
-export async function getMyEntraRoleEligibilityScheduleInstances(
+export async function getMyEntraRoleEligibilitySchedules(
 	account: AccountInfoOrId,
-): Promise<UnifiedRoleEligibilityScheduleInstanceExpanded[]> {
+): Promise<UnifiedRoleEligibilityScheduleExpanded[]> {
 	try {
 		const client = await getPimClient(account)
 
-		const request =
-			client.roleManagement.directory.roleEligibilityScheduleInstances.filterByCurrentUserWithOn('principal')
+		const request = client.roleManagement.directory.roleEligibilitySchedules.filterByCurrentUserWithOn('principal')
 		const response = await request.get({
 			queryParameters: {
 				expand: ['roleDefinition', 'principal'],
 			},
 		})
 
-		return (response?.value as UnifiedRoleEligibilityScheduleInstanceExpanded[]) ?? []
+		return (response?.value as UnifiedRoleEligibilityScheduleExpanded[]) ?? []
 	} catch (error) {
 		console.error('Error fetching role eligibility schedule instances:', error)
 		throw error
 	}
 }
 
-export async function getMyEntraGroupEligibilityScheduleInstances(
+export async function getMyEntraGroupEligibilitySchedules(
 	account: AccountInfoOrId,
-): Promise<PrivilegedAccessGroupEligibilityScheduleInstanceExpanded[]> {
+): Promise<PrivilegedAccessGroupEligibilityScheduleExpanded[]> {
 	try {
 		const client = await getPimClient(account)
 
 		const request =
-			client.identityGovernance.privilegedAccess.group.eligibilityScheduleInstances.filterByCurrentUserWithOn(
-				'principal',
-			)
+			client.identityGovernance.privilegedAccess.group.eligibilitySchedules.filterByCurrentUserWithOn('principal')
 		const response = await request.get({
 			queryParameters: {
 				expand: ['group', 'principal'],
 			},
 		})
 
-		return (response?.value as PrivilegedAccessGroupEligibilityScheduleInstanceExpanded[]) ?? []
+		return (response?.value as PrivilegedAccessGroupEligibilityScheduleExpanded[]) ?? []
 	} catch (error) {
 		console.error('Error fetching group eligibility schedule instances:', error)
 		throw error

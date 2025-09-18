@@ -1,16 +1,16 @@
 import {
 	DirectoryObject,
 	Group,
-	PrivilegedAccessGroupEligibilityScheduleInstance,
-} from '@/api/generated/msgraph/models'
-import { UnifiedRoleEligibilityScheduleInstanceExpanded } from '@/api/pimGraph'
-import { RoleEligibilityScheduleInstance } from '@azure/arm-authorization'
+	PrivilegedAccessGroupEligibilitySchedule,
+} from '@/api/generated/msgraph/models';
+import { UnifiedRoleEligibilityScheduleExpanded } from '@/api/pimGraph';
+import { RoleEligibilitySchedule } from '@azure/arm-authorization';
 
 /**
- * Expanded interface for PrivilegedAccessGroupEligibilityScheduleInstance with populated group and principal
+ * Expanded interface for PrivilegedAccessGroupEligibilitySchedule with populated group and principal
  */
-export interface PrivilegedAccessGroupEligibilityScheduleInstanceExpanded
-	extends PrivilegedAccessGroupEligibilityScheduleInstance {
+export interface PrivilegedAccessGroupEligibilityScheduleExpanded
+	extends PrivilegedAccessGroupEligibilitySchedule {
 	group: Group & {
 		displayName?: string
 		description?: string
@@ -53,17 +53,17 @@ export interface CommonRoleSchedule {
 	endDateTime?: Date
 	/** Original schedule instance for activation purposes */
 	originalSchedule:
-		| RoleEligibilityScheduleInstance
-		| UnifiedRoleEligibilityScheduleInstanceExpanded
-		| PrivilegedAccessGroupEligibilityScheduleInstanceExpanded
+		| RoleEligibilitySchedule
+		| UnifiedRoleEligibilityScheduleExpanded
+		| PrivilegedAccessGroupEligibilityScheduleExpanded
 	/** Source API type for debugging and specific operations */
 	sourceType: 'arm' | 'graph' | 'group'
 }
 
 /**
- * Converts an Azure ARM RoleEligibilityScheduleInstance to the common interface.
+ * Converts an Azure ARM RoleEligibilitySchedule to the common interface.
  */
-export function fromArmSchedule(schedule: RoleEligibilityScheduleInstance): CommonRoleSchedule {
+export function fromArmSchedule(schedule: RoleEligibilitySchedule): CommonRoleSchedule {
 	return {
 		id: schedule.id ?? '',
 		scope: schedule.scope ?? '',
@@ -81,9 +81,9 @@ export function fromArmSchedule(schedule: RoleEligibilityScheduleInstance): Comm
 }
 
 /**
- * Converts a Microsoft Graph UnifiedRoleEligibilityScheduleInstanceExpanded to the common interface.
+ * Converts a Microsoft Graph UnifiedRoleEligibilityScheduleExpanded to the common interface.
  */
-export function fromGraphSchedule(schedule: UnifiedRoleEligibilityScheduleInstanceExpanded): CommonRoleSchedule {
+export function fromGraphSchedule(schedule: UnifiedRoleEligibilityScheduleExpanded): CommonRoleSchedule {
 	return {
 		id: schedule.id ?? '',
 		scope: schedule.directoryScopeId ?? '/',
@@ -93,18 +93,20 @@ export function fromGraphSchedule(schedule: UnifiedRoleEligibilityScheduleInstan
 		scopeType: schedule.directoryScopeId === '/' ? 'directory' : undefined,
 		principalId: schedule.principalId ?? '',
 		principalDisplayName: schedule.principal?.displayName,
-		startDateTime: schedule.startDateTime ? new Date(schedule.startDateTime) : undefined,
-		endDateTime: schedule.endDateTime ? new Date(schedule.endDateTime) : undefined,
+		startDateTime: schedule.scheduleInfo?.startDateTime ? new Date(schedule.scheduleInfo.startDateTime) : undefined,
+		endDateTime: schedule.scheduleInfo?.expiration?.endDateTime
+			? new Date(schedule.scheduleInfo.expiration.endDateTime)
+			: undefined,
 		originalSchedule: schedule,
 		sourceType: 'graph',
 	}
 }
 
 /**
- * Converts a Microsoft Graph PrivilegedAccessGroupEligibilityScheduleInstanceExpanded to the common interface.
+ * Converts a Microsoft Graph PrivilegedAccessGroupEligibilityScheduleExpanded to the common interface.
  */
 export function fromGroupSchedule(
-	schedule: PrivilegedAccessGroupEligibilityScheduleInstanceExpanded,
+	schedule: PrivilegedAccessGroupEligibilityScheduleExpanded,
 ): CommonRoleSchedule {
 	// Access ID determines the role type (owner or member)
 	const roleDisplayName = schedule.accessId === 'owner' ? 'Owner' : 'Member'
@@ -119,8 +121,10 @@ export function fromGroupSchedule(
 		scopeType: 'group',
 		principalId: schedule.principalId ?? '',
 		principalDisplayName: schedule.principal?.displayName,
-		startDateTime: schedule.startDateTime ? new Date(schedule.startDateTime) : undefined,
-		endDateTime: schedule.endDateTime ? new Date(schedule.endDateTime) : undefined,
+		startDateTime: schedule.scheduleInfo?.startDateTime ? new Date(schedule.scheduleInfo.startDateTime) : undefined,
+		endDateTime: schedule.scheduleInfo?.expiration?.endDateTime
+			? new Date(schedule.scheduleInfo.expiration.endDateTime)
+			: undefined,
 		originalSchedule: schedule,
 		sourceType: 'group',
 	}

@@ -1,8 +1,8 @@
-import { getMilliseconds } from '@/api/time'
-import { CommonRoleAssignmentScheduleInstance } from '@/model/CommonRoleAssignmentScheduleInstance'
-import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
-import { EligibleRole } from '@/model/EligibleRole'
-import { KnownStatus } from '@azure/arm-authorization'
+import { getMilliseconds } from '@/api/time';
+import { CommonRoleAssignmentScheduleInstance } from '@/model/CommonRoleAssignmentScheduleInstance';
+import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule';
+import { EligibleRole } from '@/model/EligibleRole';
+import { KnownStatus } from '@azure/arm-authorization';
 import {
 	useMutation,
 	useQueries,
@@ -10,14 +10,14 @@ import {
 	useQueryClient,
 	UseQueryResult,
 	useSuspenseQuery,
-} from '@tanstack/react-query'
-import dayjs from 'dayjs'
-import { getAllAccounts } from '../api/auth'
-import { deactivateEligibleRole, getMyRoleEligibilityScheduleInstances } from '../api/pim'
+} from '@tanstack/react-query';
+import dayjs from 'dayjs';
+import { getAllAccounts } from '../api/auth';
+import { deactivateEligibleRole, getMyRoleEligibilitySchedules } from '../api/pim';
 import {
-	getMyEntraGroupEligibilityScheduleInstances,
-	getMyEntraRoleEligibilityScheduleInstances,
-} from '../api/pimGraph'
+	getMyEntraGroupEligibilitySchedules,
+	getMyEntraRoleEligibilitySchedules,
+} from '../api/pimGraph';
 
 export function useRoleTableQueries() {
 	const refetchInterval = getMilliseconds(30, 'seconds')
@@ -49,7 +49,7 @@ export function useRoleTableQueries() {
 			queryKey: ['pim', 'armEligibleRoles', accountId],
 			refetchInterval,
 			queryFn: async () => {
-				const schedules = await Array.fromAsync(getMyRoleEligibilityScheduleInstances(accountId))
+				const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(accountId))
 				return schedules.map<EligibleRole>(schedule => ({
 					accountId: accountId,
 					schedule: fromArmSchedule(schedule),
@@ -63,7 +63,7 @@ export function useRoleTableQueries() {
 			queryKey: ['pim', 'graphEligibleRoles', accountId],
 			refetchInterval,
 			queryFn: async () => {
-				const schedules = await getMyEntraRoleEligibilityScheduleInstances(accountId)
+				const schedules = await getMyEntraRoleEligibilitySchedules(accountId)
 				return schedules.map(schedule => ({
 					accountId: accountId,
 					schedule: fromGraphSchedule(schedule),
@@ -77,7 +77,7 @@ export function useRoleTableQueries() {
 			queryKey: ['pim', 'groupEligibleRoles', accountId],
 			refetchInterval,
 			queryFn: async () => {
-				const groupScheduleResult = await getMyEntraGroupEligibilityScheduleInstances(accountId)
+				const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(accountId)
 				return groupScheduleResult.map<EligibleRole>(schedule => ({
 					accountId: accountId,
 					schedule: fromGroupSchedule(schedule),
