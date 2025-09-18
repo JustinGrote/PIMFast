@@ -1,6 +1,6 @@
 import {
-	PrivilegedAccessGroupAssignmentScheduleInstanceExpanded,
-	UnifiedRoleAssignmentScheduleInstanceExpanded,
+	PrivilegedAccessGroupAssignmentScheduleExpanded,
+	UnifiedRoleAssignmentScheduleExpanded,
 } from '@/model/CommonRoleAssignmentScheduleInstance';
 import { PrivilegedAccessGroupEligibilityScheduleExpanded } from '@/model/CommonRoleSchedule';
 import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole';
@@ -148,12 +148,12 @@ export const deactivateEntraRoleAssignmentScheduleRequest = async (role: Eligibl
  * These represent active role assignments.
  *
  * @param account - The Azure MSAL account information for authentication.
- * @returns A promise that resolves to an array of UnifiedRoleAssignmentScheduleInstance objects.
+ * @returns A promise that resolves to an array of UnifiedRoleAssignmentScheduleExpanded objects.
  * @throws Will throw an error if fetching fails.
  */
 export async function getMyEntraRoleAssignmentScheduleInstances(
 	account: AccountInfoOrId,
-): Promise<UnifiedRoleAssignmentScheduleInstanceExpanded[]> {
+): Promise<UnifiedRoleAssignmentScheduleExpanded[]> {
 	try {
 		const client = await getPimClient(account)
 
@@ -165,7 +165,7 @@ export async function getMyEntraRoleAssignmentScheduleInstances(
 			},
 		})
 
-		return (response?.value as UnifiedRoleAssignmentScheduleInstanceExpanded[]) ?? []
+		return (response?.value as UnifiedRoleAssignmentScheduleExpanded[]) ?? []
 	} catch (error) {
 		console.error('Error fetching Entra role assignment schedule instances:', error)
 		throw error
@@ -177,12 +177,12 @@ export async function getMyEntraRoleAssignmentScheduleInstances(
  * These represent active group role assignments.
  *
  * @param account - The Azure MSAL account information for authentication.
- * @returns A promise that resolves to an array of PrivilegedAccessGroupAssignmentScheduleInstance objects.
+ * @returns A promise that resolves to an array of PrivilegedAccessGroupAssignmentScheduleExpanded objects.
  * @throws Will throw an error if fetching fails.
  */
 export async function getMyEntraGroupAssignmentScheduleInstances(
 	account: AccountInfoOrId,
-): Promise<PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]> {
+): Promise<PrivilegedAccessGroupAssignmentScheduleExpanded[]> {
 	try {
 		const client = await getPimClient(account)
 
@@ -196,7 +196,7 @@ export async function getMyEntraGroupAssignmentScheduleInstances(
 			},
 		})
 
-		return (response?.value as PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]) ?? []
+		return (response?.value as PrivilegedAccessGroupAssignmentScheduleExpanded[]) ?? []
 	} catch (error) {
 		console.error('Error fetching group assignment schedule instances:', error)
 		throw error

@@ -1,15 +1,15 @@
 import {
 	DirectoryObject,
 	Group,
-	PrivilegedAccessGroupAssignmentScheduleInstance,
-	UnifiedRoleAssignmentScheduleInstance,
-} from '@/api/generated/msgraph/models'
-import { RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
+	PrivilegedAccessGroupAssignmentSchedule,
+	UnifiedRoleAssignmentSchedule,
+} from '@/api/generated/msgraph/models';
+import { RoleAssignmentSchedule } from '@azure/arm-authorization';
 
 /**
- * Expanded interface for UnifiedRoleAssignmentScheduleInstance with populated roleDefinition and principal
+ * Expanded interface for UnifiedRoleAssignmentSchedule with populated roleDefinition and principal
  */
-export interface UnifiedRoleAssignmentScheduleInstanceExpanded extends UnifiedRoleAssignmentScheduleInstance {
+export interface UnifiedRoleAssignmentScheduleExpanded extends UnifiedRoleAssignmentSchedule {
 	roleDefinition?: {
 		id?: string
 		displayName?: string
@@ -22,10 +22,10 @@ export interface UnifiedRoleAssignmentScheduleInstanceExpanded extends UnifiedRo
 }
 
 /**
- * Expanded interface for PrivilegedAccessGroupAssignmentScheduleInstance with populated group and principal
+ * Expanded interface for PrivilegedAccessGroupAssignmentSchedule with populated group and principal
  */
-export interface PrivilegedAccessGroupAssignmentScheduleInstanceExpanded
-	extends PrivilegedAccessGroupAssignmentScheduleInstance {
+export interface PrivilegedAccessGroupAssignmentScheduleExpanded
+	extends PrivilegedAccessGroupAssignmentSchedule {
 	group?: Group & {
 		displayName?: string
 		description?: string
@@ -72,17 +72,17 @@ export interface CommonRoleAssignmentScheduleInstance {
 	linkedRoleEligibilityScheduleInstanceId?: string
 	/** Original assignment schedule instance for specific operations */
 	originalAssignment:
-		| RoleAssignmentScheduleInstance
-		| UnifiedRoleAssignmentScheduleInstanceExpanded
-		| PrivilegedAccessGroupAssignmentScheduleInstanceExpanded
+		| RoleAssignmentSchedule
+		| UnifiedRoleAssignmentScheduleExpanded
+		| PrivilegedAccessGroupAssignmentScheduleExpanded
 	/** Source API type for debugging and specific operations */
 	sourceType: 'arm' | 'graph' | 'group'
 }
 
 /**
- * Converts an Azure ARM RoleAssignmentScheduleInstance to the common interface.
+ * Converts an Azure ARM RoleAssignmentSchedule to the common interface.
  */
-export function fromArmAssignment(assignment: RoleAssignmentScheduleInstance): CommonRoleAssignmentScheduleInstance {
+export function fromArmAssignment(assignment: RoleAssignmentSchedule): CommonRoleAssignmentScheduleInstance {
 	return {
 		id: assignment.id ?? '',
 		scope: assignment.scope ?? '',
@@ -95,17 +95,17 @@ export function fromArmAssignment(assignment: RoleAssignmentScheduleInstance): C
 		startDateTime: assignment.startDateTime ? new Date(assignment.startDateTime) : undefined,
 		endDateTime: assignment.endDateTime ? new Date(assignment.endDateTime) : undefined,
 		status: assignment.status,
-		linkedRoleEligibilityScheduleInstanceId: assignment.linkedRoleEligibilityScheduleInstanceId,
+		linkedRoleEligibilityScheduleInstanceId: assignment.linkedRoleEligibilityScheduleId,
 		originalAssignment: assignment,
 		sourceType: 'arm',
 	}
 }
 
 /**
- * Converts a Microsoft Graph UnifiedRoleAssignmentScheduleInstanceExpanded to the common interface.
+ * Converts a Microsoft Graph UnifiedRoleAssignmentScheduleExpanded to the common interface.
  */
 export function fromGraphAssignment(
-	assignment: UnifiedRoleAssignmentScheduleInstanceExpanded,
+	assignment: UnifiedRoleAssignmentScheduleExpanded,
 ): CommonRoleAssignmentScheduleInstance {
 	return {
 		id: assignment.id ?? '',
@@ -116,8 +116,8 @@ export function fromGraphAssignment(
 		scopeType: assignment.directoryScopeId === '/' ? 'directory' : undefined,
 		principalId: assignment.principalId ?? '',
 		principalDisplayName: assignment.principal?.displayName,
-		startDateTime: assignment.startDateTime ? new Date(assignment.startDateTime) : undefined,
-		endDateTime: assignment.endDateTime ? new Date(assignment.endDateTime) : undefined,
+		startDateTime: assignment.scheduleInfo?.startDateTime ? new Date(assignment.scheduleInfo.startDateTime) : undefined,
+		endDateTime: assignment.scheduleInfo?.expiration?.endDateTime ? new Date(assignment.scheduleInfo.expiration.endDateTime) : undefined,
 		status: assignment.assignmentType ?? undefined, // Graph uses assignmentType instead of status
 		originalAssignment: assignment,
 		sourceType: 'graph',
@@ -125,10 +125,10 @@ export function fromGraphAssignment(
 }
 
 /**
- * Converts a Microsoft Graph PrivilegedAccessGroupAssignmentScheduleInstanceExpanded to the common interface.
+ * Converts a Microsoft Graph PrivilegedAccessGroupAssignmentScheduleExpanded to the common interface.
  */
 export function fromGroupAssignment(
-	assignment: PrivilegedAccessGroupAssignmentScheduleInstanceExpanded,
+	assignment: PrivilegedAccessGroupAssignmentScheduleExpanded,
 ): CommonRoleAssignmentScheduleInstance {
 	// Access ID determines the role type (owner or member)
 	const roleDisplayName = assignment.accessId === 'owner' ? 'Owner' : 'Member'
@@ -137,14 +137,14 @@ export function fromGroupAssignment(
 	return {
 		id: assignment.id ?? '',
 		scope: assignment.accessId ?? '',
-		roleDefinitionId: assignment.groupId ?? '',
+		roleDefinitionId: assignment.group?.id ?? '',
 		roleDefinitionDisplayName: `${roleDisplayName} of ${groupDisplayName}`,
 		scopeDisplayName: groupDisplayName,
 		scopeType: 'group',
 		principalId: assignment.principalId ?? '',
 		principalDisplayName: assignment.principal?.displayName,
-		startDateTime: assignment.startDateTime ? new Date(assignment.startDateTime) : undefined,
-		endDateTime: assignment.endDateTime ? new Date(assignment.endDateTime) : undefined,
+		startDateTime: assignment.scheduleInfo?.startDateTime ? new Date(assignment.scheduleInfo.startDateTime) : undefined,
+		endDateTime: assignment.scheduleInfo?.expiration?.endDateTime ? new Date(assignment.scheduleInfo.expiration.endDateTime) : undefined,
 		status: assignment.assignmentType ?? undefined, // Group uses assignmentType instead of status
 		originalAssignment: assignment,
 		sourceType: 'group',
