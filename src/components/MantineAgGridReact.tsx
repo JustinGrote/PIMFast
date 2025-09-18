@@ -1,9 +1,9 @@
-import { useComputedColorScheme } from '@mantine/core'
-import { AllCommunityModule, colorSchemeDark, colorSchemeLight, ModuleRegistry, themeBalham } from 'ag-grid-community'
-import { AgGridReact, AgGridReactProps } from 'ag-grid-react'
-import { useMemo } from 'react'
+import { useComputedColorScheme } from '@mantine/core';
+import { AllCommunityModule, colorSchemeDark, colorSchemeLight, ModuleRegistry, themeBalham } from 'ag-grid-community';
+import { AgGridReact, AgGridReactProps } from 'ag-grid-react';
+import { useMemo } from 'react';
 
-import './MantineAgGridReact.css'
+import './MantineAgGridReact.css';
 
 // Register all Community features
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -27,10 +27,9 @@ export default function MantineAgGridReact<T>({ ...agGridProps }: AgGridReactPro
 			...agGridProps,
 			theme: gridTheme,
 			className: `mantineAgGrid ${agGridProps.className || ''}`.trim(),
-			domLayout: 'autoHeight',
+			domLayout: 'autoHeight' as 'autoHeight', // Ensure correct type assignment
 		}),
 		[agGridProps, gridTheme],
 	)
-
 	return <AgGridReact {...defaultGridOptions} />
 }

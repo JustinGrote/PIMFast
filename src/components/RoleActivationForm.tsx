@@ -33,20 +33,20 @@
  * @see RoleActivationExample.tsx for complete usage examples
  */
 
-import { activateEligibleRole } from '@/api/pim'
-import { throwError } from '@/api/util'
-import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest'
-import { EligibleRole } from '@/model/EligibleRole'
-import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
-import { DateTimePicker } from '@mantine/dates'
-import { useForm } from '@mantine/form'
-import { useDisclosure } from '@mantine/hooks'
-import { IconCheck } from '@tabler/icons-react'
-import { useMutation } from '@tanstack/react-query'
-import dayjs from 'dayjs'
-import durationPlugin from 'dayjs/plugin/duration'
-import { humanizer } from 'humanize-duration'
-import { useState } from 'react'
+import { activateEligibleRole } from '@/api/pim';
+import { throwError } from '@/api/util';
+import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest';
+import { EligibleRole } from '@/model/EligibleRole';
+import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core';
+import { DateTimePicker } from '@mantine/dates';
+import { useForm } from '@mantine/form';
+import { useDisclosure } from '@mantine/hooks';
+import { IconCheck } from '@tabler/icons-react';
+import { useMutation } from '@tanstack/react-query';
+import dayjs from 'dayjs';
+import durationPlugin from 'dayjs/plugin/duration';
+import { humanizer } from 'humanize-duration';
+import { useState } from 'react';
 
 dayjs.extend(durationPlugin)
 
@@ -163,7 +163,7 @@ export function RoleActivationForm({
 			principalId: schedule.principalId,
 			roleDefinitionId: schedule.roleDefinitionId,
 			startDateTime: startTime || new Date(),
-			duration: durationMinutes,
+			endDateTime: dayjs(startTime || new Date()).add(durationMinutes, 'minutes').toDate(),
 		}
 	}
 

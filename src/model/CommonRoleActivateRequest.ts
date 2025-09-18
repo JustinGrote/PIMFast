@@ -1,11 +1,11 @@
 // Import necessary models
 import {
 	PrivilegedAccessGroupAssignmentScheduleRequest,
-	UnifiedRoleAssignmentScheduleRequest,
-} from '@/api/generated/msgraph/models'
-import { RoleAssignmentScheduleRequest } from '@azure/arm-authorization'
-import { Duration } from '@microsoft/kiota-abstractions'
-import dayjs from 'dayjs'
+	UnifiedRoleAssignmentScheduleRequest
+} from '@/api/generated/msgraph/models';
+import { KnownType, RoleAssignmentScheduleRequest } from '@azure/arm-authorization';
+import dayjs from 'dayjs';
+import { match, P } from 'ts-pattern';
 
 /**
  * Common interface for role assignment schedule requests that abstracts the differences
@@ -27,8 +27,8 @@ export interface CommonRoleActivateRequest {
 	ticketInfo?: { ticketNumber?: string }
 	/** Start time for the assignment */
 	startDateTime?: Date
-	/** Length of assignment, in minutes */
-	duration: number
+	/** End time for the assignment. Undefined means no expiration */
+	endDateTime?: Date
 	/** Type of request (e.g., 'SelfActivate', 'AdminAssign', etc.) */
 	requestType: string
 	/** Linked eligibility schedule ID (ARM only) */
@@ -54,8 +54,8 @@ export const toArmRoleAssignmentScheduleRequest = (
 	scheduleInfo: {
 		startDateTime: common.startDateTime,
 		expiration: {
-			type: 'AfterDuration',
-			duration: dayjs.duration(common.duration, 'minutes').toISOString(),
+			type: 'AfterDateTime',
+			endDateTime: common.endDateTime,
 		},
 	},
 })
@@ -75,17 +75,8 @@ export const toEntraRoleAssignmentScheduleRequest = (
 	scheduleInfo: {
 		startDateTime: common.startDateTime,
 		expiration: {
-			duration: new Duration({
-				years: 0,
-				minutes: common.duration,
-				months: 0,
-				weeks: 0,
-				days: 0,
-				hours: 0,
-				seconds: 0,
-				negative: false,
-			}),
-			type: 'afterDuration',
+			type: 'afterDateTime',
+			endDateTime: common.endDateTime,
 		},
 	},
 	// assignmentType: common.requestType, // Not a valid property
@@ -106,22 +97,29 @@ export const toGroupRoleAssignmentScheduleRequest = (
 		startDateTime: common.startDateTime,
 		expiration: {
 			type: 'afterDateTime',
-			endDateTime: dayjs(common.startDateTime).add(common.duration, 'minutes').toDate(),
+			endDateTime: common.endDateTime,
 		},
 	},
 	justification: common.justification,
 })
 
+/** Convert to the appropriate end date format */
+function coalesceArmExpiration(arm: RoleAssignmentScheduleRequest): Date | undefined {
+	return match(arm.scheduleInfo?.expiration?.type as KnownType)
+		.with(KnownType.NoExpiration, () => undefined)
+		.with(KnownType.AfterDateTime, () => arm.scheduleInfo?.expiration?.endDateTime)
+		.with(KnownType.AfterDuration, () => {
+			const start = arm.scheduleInfo?.startDateTime ?? new Date();
+			const minutes = dayjs.duration(arm.scheduleInfo?.expiration?.duration || 'PT0M').asMinutes();
+			return dayjs(start).add(minutes).toDate();
+		})
+		.exhaustive();
+}
+
 /**
  * Converts an Azure ARM RoleAssignmentScheduleRequest to CommonRoleActivateRequest
  */
-export const fromArmRoleAssignmentScheduleRequest = (arm: RoleAssignmentScheduleRequest): CommonRoleActivateRequest => {
-	// Extract duration from ISO 8601 duration string
-	const durationMinutes = arm.scheduleInfo?.expiration?.duration
-		? dayjs.duration(arm.scheduleInfo.expiration.duration).asMinutes()
-		: 480 // Default to 8 hours if not specified
-
-	return {
+export const fromArmRoleAssignmentScheduleRequest = (arm: RoleAssignmentScheduleRequest): CommonRoleActivateRequest => ({
 		id: arm.id || '',
 		scope: arm.scope || '',
 		roleDefinitionId: arm.roleDefinitionId || '',
@@ -129,11 +127,32 @@ export const fromArmRoleAssignmentScheduleRequest = (arm: RoleAssignmentSchedule
 		justification: arm.justification,
 		ticketInfo: arm.ticketInfo,
 		startDateTime: arm.scheduleInfo?.startDateTime,
-		duration: durationMinutes,
+		endDateTime: coalesceArmExpiration(arm),
 		requestType: arm.requestType || 'SelfActivate',
 		linkedRoleEligibilityScheduleId: arm.linkedRoleEligibilityScheduleId,
 		sourceType: 'arm',
-	}
+	})
+
+
+/** Coalesce expiration for Entra/Graph and Group role schedule requests */
+function coalesceGraphExpiration(
+	request: UnifiedRoleAssignmentScheduleRequest
+): Date | undefined {
+	const scheduleInfo = request.scheduleInfo;
+	const expiration = scheduleInfo?.expiration;
+	return match(expiration?.type)
+		.with(P.nullish, () => undefined)
+		.with('notSpecified', () => undefined)
+		.with('noExpiration', () => undefined)
+		.with('afterDateTime', () => expiration?.endDateTime ?? undefined)
+		.with('afterDuration', () => {
+			const start = scheduleInfo?.startDateTime ?? new Date()
+			const graphDuration = scheduleInfo?.expiration?.duration
+			if (!graphDuration) return undefined
+			const duration = dayjs.duration(graphDuration.toString())
+			return dayjs(start).add(duration).toDate();
+		})
+		.exhaustive();
 }
 
 /**
@@ -142,9 +161,6 @@ export const fromArmRoleAssignmentScheduleRequest = (arm: RoleAssignmentSchedule
 export const fromEntraRoleAssignmentScheduleRequest = (
 	graph: UnifiedRoleAssignmentScheduleRequest,
 ): CommonRoleActivateRequest => {
-	// Extract duration from Duration object
-	const durationMinutes = graph.scheduleInfo?.expiration?.duration?.minutes || 480 // Default to 8 hours
-
 	return {
 		id: graph.id || '',
 		scope: graph.directoryScopeId || '/',
@@ -152,11 +168,29 @@ export const fromEntraRoleAssignmentScheduleRequest = (
 		principalId: graph.principalId || '',
 		justification: graph.justification || undefined,
 		ticketInfo: graph.ticketInfo ? { ticketNumber: graph.ticketInfo.ticketNumber || undefined } : undefined,
-		startDateTime: graph.scheduleInfo?.startDateTime || undefined,
-		duration: durationMinutes,
+		startDateTime: graph.scheduleInfo?.startDateTime ?? undefined,
+		endDateTime: coalesceGraphExpiration(graph),
 		requestType: graph.action || 'selfActivate',
 		sourceType: 'graph',
 	}
+}
+
+function coalesceGroupExpiration(
+	scheduleInfo: PrivilegedAccessGroupAssignmentScheduleRequest['scheduleInfo']
+): Date | undefined {
+	const expiration = scheduleInfo?.expiration;
+	return match(expiration?.type)
+		.with(P.nullish, () => undefined)
+		.with('notSpecified', () => undefined)
+		.with('noExpiration', () => undefined)
+		.with('afterDateTime', () => expiration?.endDateTime ?? undefined)
+		.with('afterDuration', () => {
+			const start = scheduleInfo?.startDateTime ?? new Date();
+			if (!expiration?.duration) return undefined;
+			const endDuration = dayjs.duration(expiration.duration.toString());
+			return dayjs(start).add(endDuration).toDate();
+		})
+		.exhaustive();
 }
 
 /**
@@ -164,27 +198,15 @@ export const fromEntraRoleAssignmentScheduleRequest = (
  */
 export const fromGroupRoleAssignmentScheduleRequest = (
 	group: PrivilegedAccessGroupAssignmentScheduleRequest,
-): CommonRoleActivateRequest => {
-	// Calculate duration from start and end times
-	let durationMinutes = 480 // Default to 8 hours
-
-	if (group.scheduleInfo?.startDateTime && group.scheduleInfo?.expiration?.endDateTime) {
-		durationMinutes = dayjs(group.scheduleInfo.expiration.endDateTime).diff(
-			dayjs(group.scheduleInfo.startDateTime),
-			'minutes',
-		)
-	}
-
-	return {
-		id: group.id || '',
-		scope: group.groupId || '',
-		roleDefinitionId: group.accessId || 'member',
-		principalId: group.principalId || '',
-		justification: group.justification || undefined,
-		ticketInfo: group.ticketInfo ? { ticketNumber: group.ticketInfo.ticketNumber || undefined } : undefined,
-		startDateTime: group.scheduleInfo?.startDateTime || undefined,
-		duration: durationMinutes,
-		requestType: group.action || 'selfActivate',
-		sourceType: 'group',
-	}
-}
+): CommonRoleActivateRequest => ({
+	id: group.id || '',
+	scope: group.groupId || '',
+	roleDefinitionId: group.accessId || 'member',
+	principalId: group.principalId || '',
+	justification: group.justification || undefined,
+	ticketInfo: group.ticketInfo ? { ticketNumber: group.ticketInfo.ticketNumber || undefined } : undefined,
+	startDateTime: group.scheduleInfo?.startDateTime ?? undefined,
+	endDateTime: coalesceGroupExpiration(group.scheduleInfo),
+	requestType: group.action || 'selfActivate',
+	sourceType: 'group',
+})
