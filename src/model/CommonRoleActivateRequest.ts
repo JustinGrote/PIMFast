@@ -79,8 +79,6 @@ export const toEntraRoleAssignmentScheduleRequest = (
 			endDateTime: common.endDateTime,
 		},
 	},
-	// assignmentType: common.requestType, // Not a valid property
-	// ...other Graph-specific fields as needed
 })
 
 /**
@@ -89,10 +87,10 @@ export const toEntraRoleAssignmentScheduleRequest = (
 export const toGroupRoleAssignmentScheduleRequest = (
 	common: CommonRoleActivateRequest,
 ): PrivilegedAccessGroupAssignmentScheduleRequest => ({
+	action: 'selfActivate',
 	accessId: 'member', // Cast to satisfy type
 	principalId: common.principalId,
 	groupId: common.scope,
-	action: 'selfActivate',
 	scheduleInfo: {
 		startDateTime: common.startDateTime,
 		expiration: {
