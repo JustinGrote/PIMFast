@@ -1,23 +1,23 @@
-import { getAccountByLocalId } from '@/api/auth'
-import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/api/azureResourceId'
-import { throwIfNotError } from '@/api/util'
-import { AzureResource } from '@/components/icons/AzureResource'
-import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { EligibleRole } from '@/model/EligibleRole'
-import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
-import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
-import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
-import { ColDef, GridApi, GridReadyEvent, RowClassParams } from 'ag-grid-community'
-import dayjs from 'dayjs'
-import durationPlugin from 'dayjs/plugin/duration'
-import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { useMemo, useState } from 'react'
-import { match } from 'ts-pattern'
-import ExpiresCountdown from './ExpiresCountdown'
-import MantineAgGridReact from './MantineAgGridReact'
-import ResolvedTenantName from './ResolvedTenantName'
-import { useRoleTableQueries } from './RoleTable.query'
+import { getAccountByLocalId } from '@/api/auth';
+import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/api/azureResourceId';
+import { throwIfNotError } from '@/api/util';
+import { AzureResource } from '@/components/icons/AzureResource';
+import { RoleActivationForm } from '@/components/RoleActivationForm';
+import { EligibleRole } from '@/model/EligibleRole';
+import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react';
+import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons';
+import { ColDef, GridApi, GridReadyEvent, RowClassParams } from 'ag-grid-community';
+import dayjs from 'dayjs';
+import durationPlugin from 'dayjs/plugin/duration';
+import relativeTimePlugin from 'dayjs/plugin/relativeTime';
+import { useMemo, useState } from 'react';
+import { match } from 'ts-pattern';
+import ExpiresCountdown from './ExpiresCountdown';
+import MantineAgGridReact from './MantineAgGridReact';
+import ResolvedTenantName from './ResolvedTenantName';
+import { useRoleTableQueries } from './RoleTable.query';
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -185,7 +185,6 @@ function RoleTable() {
 					<div className="one-line-row">
 						<Group>
 							<ActionIcon
-								size="sm"
 								variant="subtle"
 								disabled={isEligibleRoleNewlyActivated(params.data)}
 								onClick={() => {
@@ -208,7 +207,6 @@ function RoleTable() {
 										/>
 									) : (
 										<IconPlayerPlay
-											size="sm"
 											color="green"
 											title="Activate Role"
 										/>
