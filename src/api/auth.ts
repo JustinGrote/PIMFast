@@ -1,4 +1,4 @@
-import { AccessToken, TokenCredential } from '@azure/identity'
+import { AccessToken, TokenCredential } from '@azure/identity';
 import {
 	AccountInfo,
 	AuthenticationResult,
@@ -10,9 +10,9 @@ import {
 	NetworkRequestOptions,
 	NetworkResponse,
 	PublicClientApplication,
-} from '@azure/msal-browser'
-import { FetchClient } from '../../node_modules/@azure/msal-browser/dist/network/FetchClient'
-import { throwError, throwIfNotError } from './util'
+} from '@azure/msal-browser';
+import { FetchClient } from '../../node_modules/@azure/msal-browser/dist/network/FetchClient';
+import { throwError, throwIfNotError } from './util';
 
 /**
  * This module provides authentication functionality using MSAL.js for a Chrome extension.
@@ -83,7 +83,7 @@ export async function login() {
 	// Check if extension is installed
 	if (chrome?.runtime?.sendMessage) {
 		// Make a request:
-		console.log('Try WAM Handshake')
+		console.debug('sendMessage is available, trying to find WAM extension at ID', MICROSOFT_SSO_EXTENSION_ID)
 		try {
 			const response = await chrome.runtime.sendMessage(MICROSOFT_SSO_EXTENSION_ID, {
 				action: 'handshake',
@@ -95,7 +95,11 @@ export async function login() {
 			console.log('WAM Messaging Response', response)
 		} catch (err) {
 			throwIfNotError(err)
-			console.error('WAM Messaging Error', err)
+			if (err.message.includes('Could not establish connection')) {
+				console.warn('WAM Extension not installed or not responding, falling back to redirect')
+			} else {
+				console.error('WAM Messaging Error', err)
+			}
 		}
 	}
 

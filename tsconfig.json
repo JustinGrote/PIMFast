@@ -1,24 +1,7 @@
 {
+  "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/ts.tsbuildinfo",
-    "target": "es2024",
-    "lib": ["ESNext", "ESNext.Array", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "chrome"],
-    "jsx": "react-jsx",
-    "moduleDetection": "force",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-    "useDefineForClassFields": true,
     "allowImportingTsExtensions": true,
-    "strict": true,
-    "noFallthroughCasesInSwitch": true,
-    "noEmit": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "noUncheckedSideEffectImports": true
-  },
-  "include": ["src"]
+    "jsx": "react-jsx"
+  }
 }

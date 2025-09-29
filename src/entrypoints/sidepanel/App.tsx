@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import ErrorBoundary from '../components/ErrorBoundary'
-import RoleTable from '../components/RoleTable'
-import './App.css'
+import ErrorBoundary from '@/components/ErrorBoundary';
+import RoleTable from '@/components/RoleTable';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import './App.css';
 
 // This should probably move to individual panels
 const queryClient = new QueryClient({

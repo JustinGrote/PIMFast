@@ -1,11 +1,11 @@
-import AccountTable from '@/components/AccountTable'
-import { Alert, Button, Card, Container, Group, Loader, Stack, Text, Title } from '@mantine/core'
-import { IconAlertCircle, IconBrandAzure } from '@tabler/icons-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { hasAuthenticatedAccounts, login } from '../api/auth'
+import { hasAuthenticatedAccounts, login } from '@/api/auth';
+import AccountTable from '@/components/AccountTable';
+import { Alert, Button, Card, Container, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { IconAlertCircle, IconBrandAzure } from '@tabler/icons-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
-import './App.css'
+import './App.css';
 
 export default function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(hasAuthenticatedAccounts)

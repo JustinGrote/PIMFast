@@ -1,11 +1,11 @@
-import { MantineProvider, createTheme } from '@mantine/core'
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
+import { MantineProvider, createTheme } from '@mantine/core';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
 
-import '@mantine/core/styles.layer.css'
-import '@mantine/dates/styles.layer.css'
-import './index.css'
+import '@mantine/core/styles.layer.css';
+import '@mantine/dates/styles.layer.css';
+import './index.css';
 
 // Azure Portal-inspired theme
 const theme = createTheme({
