@@ -1,0 +1,69 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "dev",
+			"label": "Wxt",
+			"detail": "Wxt Development Server for Browser Extensions",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"icon": {
+				"color": "terminal.ansiCyan"
+			},
+			"isBackground": true,
+			"problemMatcher": [
+				{
+					"owner": "wxt",
+					// This is a placeholder pattern and won't actually match anything.
+					"pattern": {
+						"regexp": "xxx(x)(x)(x)",
+						"file": 1,
+						"line": 2,
+						"code": 3,
+						"message": 4
+					},
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": "^WXT \\d+\\.\\d+\\.\\d+",
+						"endsPattern": "✔ Built extension"
+					}
+				}
+			]
+		},
+		{
+			"type": "npm",
+			"script": "dev:edge",
+			"label": "Wxt-edge",
+			"detail": "Wxt Development Server for Browser Extensions",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"icon": {
+				"color": "terminal.ansiCyan"
+			},
+			"isBackground": true,
+			"problemMatcher": [
+				{
+					"owner": "wxt",
+					// This is a placeholder pattern and won't actually match anything.
+					"pattern": {
+						"regexp": "xxx(x)(x)(x)",
+						"file": 1,
+						"line": 2,
+						"code": 3,
+						"message": 4
+					},
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": "^WXT \\d+\\.\\d+\\.\\d+",
+						"endsPattern": "✔ Built extension"
+					}
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,59 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "chrome",
+			"request": "launch",
+			"name": "Chrome",
+			"preLaunchTask": "Wxt",
+			"runtimeExecutable": "${workspaceFolder}/.wxt/chrome-testing/chrome.exe",
+			"runtimeArgs": [
+				"--disable-extensions-except=${workspaceFolder}/.output/chrome-mv3-dev",
+				"--user-data-dir=${workspaceFolder}/.wxt/chrome-data",
+				// Optional if you want to force only testing this extension and not interactions
+				// "--disable-extensions-except=${workspaceFolder}/.output/chrome-mv3-dev",
+				// The below is additional stuff web-ext adds that we are preserving here
+				// "--disable-component-extensions-with-background-pages",
+				// "--disable-domain-reliability",
+				// "--disable-features=Translate,OptimizationHints,MediaRouter,DialMediaRouteProvider,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,CertificateTransparencyComponentUpdater,AutofillServerCommunication,PrivacySandboxSettings4",
+				// "--disable-hang-monitor",
+				// "--disable-ipc-flooding-protection",
+				// "--disable-prompt-on-repost",
+				// "--enable-unsafe-extension-debugging",
+				// "--force-fieldtrials=*BackgroundTracing/default/",
+				// "--password-store=basic",
+				// "--propagate-iph-for-testing",
+				// "--unsafely-disable-devtools-self-xss-warnings",
+				// "--use-mock-keychain",
+				"about:blank"
+			],
+		},
+		{
+			"type": "msedge",
+			"request": "launch",
+			"name": "Edge",
+			"preLaunchTask": "Wxt-edge",
+			"runtimeArgs": [
+				"--load-extension=${workspaceFolder}/.output/edge-mv3-dev",
+				"--user-data-dir=${workspaceFolder}/.wxt/edge-data",
+				// The below is additional stuff web-ext adds that we are preserving here
+				// "--disable-component-extensions-with-background-pages",
+				// "--disable-domain-reliability",
+				// "--disable-features=Translate,OptimizationHints,MediaRouter,DialMediaRouteProvider,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,CertificateTransparencyComponentUpdater,AutofillServerCommunication,PrivacySandboxSettings4",
+				// "--disable-hang-monitor",
+				// "--disable-ipc-flooding-protection",
+				// "--disable-prompt-on-repost",
+				// "--enable-unsafe-extension-debugging",
+				// "--force-fieldtrials=*BackgroundTracing/default/",
+				// "--password-store=basic",
+				// "--propagate-iph-for-testing",
+				// "--unsafely-disable-devtools-self-xss-warnings",
+				// "--use-mock-keychain",
+				"about:blank"
+			],
+		},
+	]
+}
