@@ -36,10 +36,7 @@ export const scopesGraphAndAzure = [
 	'PrivilegedAssignmentSchedule.ReadWrite.AzureADGroup',
 ]
 
-const PIMFAST_EXTENSION_ID = 'onokobaobjenkhjaopaglhmiegkchflp'
-
-const extensionRedirectUri =
-	chrome?.identity?.getRedirectURL('.auth') ?? `https://${PIMFAST_EXTENSION_ID}.chromiumapp.org/.auth`
+const extensionRedirectUri = chrome?.identity?.getRedirectURL('.auth') ?? throwError('chrome.identity.getRedirectURL is not available. Is this running in a Chrome extension?')
 
 // HACK: We can only have one login at a time so we can have a promise here that we resolve when the login is complete to make the login function below return properly when awaited
 let loginPromise: Promise<AuthenticationResult | null> | null = null
