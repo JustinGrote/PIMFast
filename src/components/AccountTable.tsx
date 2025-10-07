@@ -1,54 +1,14 @@
-import { AccountInfoUniqueId, getAllAccounts, logout } from '@/api/auth'
-import { AccountInfoDisplay } from '@/model/EligibleRole'
-import { ActionIcon, Group, LoadingOverlay, Tooltip } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
+import { ActionIcon, Group, Tooltip } from '@mantine/core'
 import { IconX } from '@tabler/icons-react'
-import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { ColDef } from 'ag-grid-community'
 import { useMemo } from 'react'
 import MantineAgGridReact from './MantineAgGridReact'
-import ResolvedTenantName from './ResolvedTenantName'
+import { useMsal } from '@azure/msal-react';
+import { AccountInfo } from '@azure/msal-browser';
 
 export default function AccountTable() {
-	const {
-		data: accounts,
-		isLoading,
-		refetch,
-	} = useSuspenseQuery<AccountInfoDisplay[]>({
-		queryKey: ['pim', 'accounts'],
-		queryFn: getAllAccounts,
-		// We do this reduction to avoid unnecessary re-renders when the access token is updated. It's also private info we don't need to expose
-		select: data =>
-			data.map(account => ({
-				name: account.name,
-				username: account.username,
-				tenantId: account.tenantId,
-				homeAccountId: account.homeAccountId,
-				localAccountId: account.localAccountId,
-			})),
-	})
-
-	const { mutate: logoutAccount, isPending } = useMutation({
-		mutationKey: ['signOut'],
-		mutationFn: async (accountId: AccountInfoUniqueId) => {
-			console.log(`Signing out account: ${accountId}`)
-			await logout(accountId)
-		},
-		onSuccess: () => {
-			refetch()
-		},
-		onError: error => {
-			notifications.show({
-				title: 'Sign Out Failed',
-				message: `Failed to sign out account: ${error}`,
-				color: 'red',
-			})
-		},
-	})
-
-	const handleSignOutAccount = (accountId: AccountInfoUniqueId) => logoutAccount(accountId)
-
-	const columnDefs: ColDef<AccountInfoDisplay>[] = useMemo(
+	const { instance, accounts } = useMsal();
+	const columnDefs: ColDef<AccountInfo>[] = useMemo(
 		() => [
 			{
 				field: 'name',
@@ -64,18 +24,18 @@ export default function AccountTable() {
 			{
 				field: 'tenantId',
 				headerName: 'Tenant',
-				cellRenderer: (params: { data: AccountInfoDisplay }) => (
-					<ResolvedTenantName
-						role={{
-							accountId: params.data.localAccountId,
-						}}
-					/>
-				),
+				// cellRenderer: (params: { data: AccountInfoDisplay }) => (
+				// 	<ResolvedTenantName
+				// 		role={{
+				// 			accountId: params.data.localAccountId,
+				// 		}}
+				// 	/>
+				// ),
 				flex: 1,
 			},
 			{
 				headerName: '',
-				cellRenderer: (params: { data: AccountInfoDisplay }) => (
+				cellRenderer: (params: { data: AccountInfo }) => (
 					<Group
 						gap="xs"
 						justify="flex-end"
@@ -84,8 +44,11 @@ export default function AccountTable() {
 							<ActionIcon
 								color="red"
 								variant="subtle"
-								loading={isPending}
-								onClick={() => handleSignOutAccount(params.data.localAccountId)}
+								onClick={() => instance.logoutRedirect({
+									account: params.data,
+									// BUG: MSAL is flushing all accounts incorrectly, so we just do a local logout here
+									onRedirectNavigate: () => false
+								})}
 							>
 								<IconX size={16} />
 							</ActionIcon>
@@ -97,27 +60,17 @@ export default function AccountTable() {
 				sortable: false,
 				filter: false,
 			},
-		],
-		[isPending, handleSignOutAccount],
+		], [instance]
 	)
 
 	return (
 		<div style={{ height: '400px', width: '100%', position: 'relative' }}>
-			<LoadingOverlay
-				visible={isLoading}
-				zIndex={1000}
-				overlayProps={{ radius: 'sm', blur: 2 }}
-			/>
 			<MantineAgGridReact
 				rowData={accounts}
 				columnDefs={columnDefs}
-				loading={isLoading}
 				getRowId={params => params.data.localAccountId}
 				domLayout="autoHeight"
 				suppressHorizontalScroll={false}
-				rowSelection={{
-					mode: 'singleRow',
-				}}
 			/>
 		</div>
 	)

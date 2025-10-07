@@ -15,7 +15,7 @@ import { EligibleRole } from '@/model/EligibleRole'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
-import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { match, P } from 'ts-pattern'
 
 /**
@@ -49,11 +49,12 @@ export default function ResolvedTenantName({ role }: { role: EligibleRoleWithOpt
 
 	const {
 		data: tenantInfo,
-		isFetching,
+		isLoading,
 		error,
 	} = useQuery<Tenant>({
 		queryKey: ['pim', 'tenant', role.accountId, role.schedule?.id],
 		enabled: tenantsFetched,
+		retry: false,
 		queryFn: async () => {
 			const tenantId = await fetchTenantIdForEligibleRole(role)
 			if (tenantInfoLookup[tenantId]) {
@@ -70,10 +71,6 @@ export default function ResolvedTenantName({ role }: { role: EligibleRoleWithOpt
 
 				// Update existing query data with this new tenant info to save on future lookups
 				tenantInfoLookup[tenantId] = tenant
-				useQueryClient().setQueryData<Record<string, Tenant>>(
-					['pim', 'tenants', account.localAccountId],
-					tenantInfoLookup,
-				)
 
 				// Convert to TenantIdDescription type
 				return tenant
@@ -87,7 +84,7 @@ export default function ResolvedTenantName({ role }: { role: EligibleRoleWithOpt
 		},
 	})
 
-	if (isFetching || tenantInfo === undefined) {
+	if (isLoading) {
 		return <Skeleton>Loading Tenant ID</Skeleton>
 	}
 
@@ -95,9 +92,13 @@ export default function ResolvedTenantName({ role }: { role: EligibleRoleWithOpt
 		throwIfNotError(error)
 
 		if (error instanceof FetchTenantSubscriptionNotFoundError) {
-			return <Text c="red">Subscription Not Found</Text>
+			return <Text c="yellow">Unknown: No Read Access to Subscription</Text>
 		}
 		return <Text c="red">Error: {error.message}</Text>
+	}
+
+	if (!tenantInfo) {
+		return <Text c="red">Error: Tenant information undefined without more specific error. This is a bug.</Text>
 	}
 
 	return (
@@ -169,7 +170,7 @@ async function fetchTenantIdForEligibleRole(role: EligibleRoleWithOptionalSchedu
 	const subscriptions = await fetchSubscriptions(account)
 	const subscription = subscriptions.find(({ subscriptionId: id }) => id === subscriptionId)
 	if (subscription === undefined) {
-		throw new Error('SubscriptionId not found')
+		throw new FetchTenantSubscriptionNotFoundError('Subscription not found in account. Likely the user does not have read access to the subscription.')
 	}
 	if (!subscription.tenantId) throw new Error('Management Group does not have a tenantId, this is probably a bug.')
 

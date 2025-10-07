@@ -76,6 +76,8 @@ export async function getRoleManagementPolicyAssignments(
 	}
 }
 
+// FIXME: Actually fetch the policy requirements
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function getPolicyRequirements(_account: AccountInfo, _schedule: RoleEligibilitySchedule) {
 	// FIXME: Implement policy requirement fetching logic
 	return {

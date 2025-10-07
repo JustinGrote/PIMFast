@@ -91,7 +91,7 @@ export async function fetchTenantNameBySubscriptionId(
 	console.debug(`Couldn't find tenant ${tenantId} in cache, fetching from API`)
 	const tenantInfo = await findTenantInformation(account, tenantId)
 	if (!tenantInfo) {
-		throw 'Failed to retrieve tenant information for tenantId: ' + tenantId
+		throw new Error(`Failed to retrieve tenant information for tenantId: ${tenantId}`)
 	}
 
 	return tenantInfo.displayName

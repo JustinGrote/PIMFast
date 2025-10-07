@@ -4,8 +4,8 @@
 		{
 			"type": "npm",
 			"script": "dev",
-			"label": "Wxt",
-			"detail": "Wxt Development Server for Browser Extensions",
+			"label": "Vite: Dev",
+			"detail": "Vite Development Server for Browser Extensions",
 			"group": {
 				"kind": "test",
 				"isDefault": true
@@ -27,43 +27,26 @@
 					},
 					"background": {
 						"activeOnStart": true,
-						"beginsPattern": "^WXT \\d+\\.\\d+\\.\\d+",
-						"endsPattern": "✔ Built extension"
+						"beginsPattern": "^vite",
+						"endsPattern": "VITE v\\d+\\.\\d+\\.\\d+\\s+ready in"
 					}
 				}
 			]
 		},
 		{
 			"type": "npm",
-			"script": "dev:edge",
-			"label": "Wxt-edge",
-			"detail": "Wxt Development Server for Browser Extensions",
+			"script": "build",
+			"label": "Vite: Build",
+			"detail": "Run vite build to produce production assets",
 			"group": {
-				"kind": "test",
+				"kind": "build",
 				"isDefault": true
 			},
 			"icon": {
-				"color": "terminal.ansiCyan"
+				"color": "terminal.ansiYellow"
 			},
-			"isBackground": true,
-			"problemMatcher": [
-				{
-					"owner": "wxt",
-					// This is a placeholder pattern and won't actually match anything.
-					"pattern": {
-						"regexp": "xxx(x)(x)(x)",
-						"file": 1,
-						"line": 2,
-						"code": 3,
-						"message": 4
-					},
-					"background": {
-						"activeOnStart": true,
-						"beginsPattern": "^WXT \\d+\\.\\d+\\.\\d+",
-						"endsPattern": "✔ Built extension"
-					}
-				}
-			]
+			"isBackground": false
+			// No problemMatcher for build; adjust if you add a matcher later.
 		}
 	]
 }

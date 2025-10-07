@@ -1,38 +1,4 @@
-/**
- * RoleActivationForm Component
- *
- * A reusable React component for creating Azure PIM role activation requests.
- * Built with Mantine UI components and @mantine/form for form state management.
- *
- * Features:
- * - Form validation using @mantine/form
- * - Support for justification, ticket number, start time, and duration
- * - Configurable policy requirements (justification/ticket required, max duration)
- * - TypeScript support with proper Azure SDK types
- * - Consistent with existing project conventions (single quotes, semicolons, etc.)
- *
- * Usage:
- * ```tsx
- * import { RoleActivationForm } from './RoleActivationForm';
- * import { EligibleRole } from './RoleTable';
- *
- * <RoleActivationForm
- *   eligibleRole={myEligibleRole}
- *   onSuccess={(request) => console.log('Success:', request)}
- *   onError={(error) => console.error('Error:', error)}
- *   onCancel={() => console.log('Cancelled')}
- *   showCancelButton={true}
- *   policyRequirements={{
- *     requiresJustification: true,
- *     requiresTicket: false,
- *     maxDuration: 'PT8H'
- *   }}
- * />
- * ```
- *
- * @see RoleActivationExample.tsx for complete usage examples
- */
-
+import { getAccountByLocalId } from '@/api/auth';
 import { activateEligibleRole } from '@/api/pim';
 import { throwError } from '@/api/util';
 import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest';
@@ -150,7 +116,7 @@ export function RoleActivationForm({
 
 	function newActivationRequest(
 		{ durationMinutes, justification, startTime, ticketNumber }: FormValues,
-		{ schedule }: EligibleRole = eligibleRole,
+		{ accountId, schedule }: EligibleRole = eligibleRole,
 	): CommonRoleActivateRequest {
 		return {
 			requestType: 'SelfActivate',
@@ -160,10 +126,11 @@ export function RoleActivationForm({
 			justification,
 			ticketInfo: ticketNumber ? { ticketNumber } : undefined,
 			linkedRoleEligibilityScheduleId: schedule.id,
-			principalId: schedule.principalId,
 			roleDefinitionId: schedule.roleDefinitionId,
 			startDateTime: startTime || new Date(),
-			endDateTime: dayjs(startTime || new Date()).add(durationMinutes, 'minutes').toDate(),
+			endDateTime: dayjs(startTime || new Date()).add(durationMinutes + .1, 'minutes').toDate(),
+			//INFO: The principal should always the be user making the request for SelfActivate
+			principalId: getAccountByLocalId(accountId).localAccountId,
 		}
 	}
 

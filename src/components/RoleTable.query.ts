@@ -3,49 +3,52 @@ import { CommonRoleAssignmentScheduleInstance } from '@/model/CommonRoleAssignme
 import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule';
 import { EligibleRole } from '@/model/EligibleRole';
 import { KnownStatus } from '@azure/arm-authorization';
+import { IPublicClientApplication } from '@azure/msal-browser';
 import {
 	useMutation,
 	useQueries,
 	useQuery,
 	useQueryClient,
 	UseQueryResult,
-	useSuspenseQuery,
 } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { getAllAccounts } from '../api/auth';
 import { deactivateEligibleRole, getMyRoleEligibilitySchedules } from '../api/pim';
 import {
 	getMyEntraGroupEligibilitySchedules,
 	getMyEntraRoleEligibilitySchedules,
 } from '../api/pimGraph';
+import { useMsal } from '@azure/msal-react';
 
-export function useRoleTableQueries() {
+export function useRoleTableQueries(instance: IPublicClientApplication) {
 	const refetchInterval = getMilliseconds(30, 'seconds')
 	const queryClient = useQueryClient()
 
-	const { data: accountIds } = useSuspenseQuery({
-		queryKey: ['pim', 'accounts'],
-		queryFn: getAllAccounts,
-		select: data => data.map(account => account.localAccountId),
-	})
+	const {accounts} = useMsal()
 
-	const { data: currentTab, refetch: updateCurrentTab } = useSuspenseQuery<chrome.tabs.Tab | undefined>({
-		queryKey: ['currentTab'],
-		queryFn: async () => {
-			const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-			return tab
-		},
-	})
+	// const { data: accountIds } = useSuspenseQuery({
+	// 	queryKey: ['pim', 'accounts'],
+	// 	queryFn: () => accounts,
+	// 	select: data => data.map(account => account.localAccountId),
+	// })
 
-	chrome.tabs.onUpdated.addListener((_tabId, _changeInfo, tab) => {
-		// We only care about updates to the active tab for this side panel.
-		if (tab.active && tab.windowId === currentTab?.windowId) {
-			updateCurrentTab()
-		}
-	})
+	// const { data: currentTab } = useSuspenseQuery<chrome.tabs.Tab | undefined>({
+	// 	queryKey: ['currentTab'],
+	// 	queryFn: async () => {
+	// 		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+	// 		return tab
+	// 	},
+	// })
+
+	// TODO: Make this extension specific
+	// chrome.tabs.onUpdated.addListener((_tabId, _changeInfo, tab) => {
+	// 	// We only care about updates to the active tab for this side panel.
+	// 	if (tab.active && tab.windowId === currentTab?.windowId) {
+	// 		updateCurrentTab()
+	// 	}
+	// })
 
 	const armEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accountIds.map(accountId => ({
+		queries: accounts.map(account => account.localAccountId).map(accountId => ({
 			queryKey: ['pim', 'armEligibleRoles', accountId],
 			refetchInterval,
 			queryFn: async () => {
@@ -59,7 +62,7 @@ export function useRoleTableQueries() {
 	})
 
 	const graphEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accountIds.map(accountId => ({
+		queries: accounts.map(account => account.localAccountId).map(accountId => ({
 			queryKey: ['pim', 'graphEligibleRoles', accountId],
 			refetchInterval,
 			queryFn: async () => {
@@ -73,7 +76,7 @@ export function useRoleTableQueries() {
 	})
 
 	const groupEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accountIds.map(accountId => ({
+		queries: accounts.map(account => account.localAccountId).map(accountId => ({
 			queryKey: ['pim', 'groupEligibleRoles', accountId],
 			refetchInterval,
 			queryFn: async () => {
@@ -92,7 +95,6 @@ export function useRoleTableQueries() {
 			armEligibleRolesQueries.every(q => q.isSuccess) &&
 			graphEligibleRolesQueries.every(q => q.isSuccess) &&
 			groupEligibleRolesQueries.every(q => q.isSuccess),
-		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['pim', 'eligibleRoles'],
 		queryFn: () => [
 			...(armEligibleRolesQueries as UseQueryResult<EligibleRole[]>[]).flatMap(q => q.data ?? []),
@@ -188,8 +190,8 @@ export function useRoleTableQueries() {
 	}
 
 	return {
-		accountIds, // Corrected from undefined accountsQuery
-		currentTab,
+		accountIds: accounts.map(account => account.localAccountId),
+		currentTab: undefined, // Placeholder as currentTab logic is commented out
 		eligibleRolesQuery,
 		roleAssignmentsQuery,
 		roleStatusQuery,

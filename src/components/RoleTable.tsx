@@ -18,6 +18,7 @@ import ExpiresCountdown from './ExpiresCountdown';
 import MantineAgGridReact from './MantineAgGridReact';
 import ResolvedTenantName from './ResolvedTenantName';
 import { useRoleTableQueries } from './RoleTable.query';
+import { useMsal } from '@azure/msal-react';
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -29,6 +30,7 @@ function RoleTable() {
 	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
 	const [gridApi, setGridApi] = useState<GridApi<EligibleRole> | null>(null)
 	const [filterQuery, setFilterQuery] = useState('')
+	const {instance} = useMsal()
 
 	const {
 		accountIds,
@@ -39,7 +41,7 @@ function RoleTable() {
 		refresh,
 		isEligibleRoleActivated,
 		isEligibleRoleNewlyActivated,
-	} = useRoleTableQueries()
+	} = useRoleTableQueries(instance)
 
 	const columnDefs: ColDef<EligibleRole>[] = useMemo(
 		() => [
@@ -261,22 +263,22 @@ function RoleTable() {
 		setGridApi(params.api)
 	}
 
-	/** Highlight roles that match the current resource in the active browser tab */
-	const getRowStyle = (params: RowClassParams<EligibleRole>) => {
-		if (!currentTab?.url || !params.data) {
-			return undefined
-		}
-		try {
-			const resourceUri = getResourceIdFromPortalUrl(currentTab.url)
-			if (resourceUri.startsWith(params.data.schedule.scope!)) {
-				return { backgroundColor: 'var(--mantine-color-gray-7)' }
-			}
-		} catch (error: unknown) {
-			throwIfNotError(error)
-			console.debug(`Failed to find resource ID in ${currentTab.url}: ${error.message}`)
-		}
-		return undefined
-	}
+	// /** Highlight roles that match the current resource in the active browser tab */
+	// const getRowStyle = (params: RowClassParams<EligibleRole>) => {
+	// 	if (!currentTab?.url || !params.data) {
+	// 		return undefined
+	// 	}
+	// 	try {
+	// 		const resourceUri = getResourceIdFromPortalUrl(currentTab.url)
+	// 		if (resourceUri.startsWith(params.data.schedule.scope!)) {
+	// 			return { backgroundColor: 'var(--mantine-color-gray-7)' }
+	// 		}
+	// 	} catch (error: unknown) {
+	// 		throwIfNotError(error)
+	// 		console.debug(`Failed to find resource ID in ${currentTab.url}: ${error.message}`)
+	// 	}
+	// 	return undefined
+	// }
 
 	const resetColumnsOrder = () => {
 		if (gridApi) {
@@ -305,7 +307,7 @@ function RoleTable() {
 						</Title>
 						<Group gap="xs">
 							<Button
-								disabled={eligibleRolesQuery.isFetching}
+								disabled={eligibleRolesQuery.isLoading}
 								variant="subtle"
 								color="green"
 								size="compact-sm"
@@ -335,12 +337,12 @@ function RoleTable() {
 					<div style={{ height: 'calc(100vh - 200px)', width: '100%', position: 'relative', minHeight: '400px' }}>
 						<MantineAgGridReact<EligibleRole>
 							className="roleTable"
-							loading={eligibleRolesQuery.isFetching}
+							loading={eligibleRolesQuery.isLoading}
 							rowData={filteredRoles}
 							columnDefs={columnDefs}
 							getRowId={params => params.data.schedule.id}
 							onGridReady={onGridReady}
-							getRowStyle={getRowStyle}
+							// getRowStyle={getRowStyle}
 							domLayout="normal"
 							rowSelection={{ mode: 'singleRow', checkboxes: false }}
 							animateRows={false}
@@ -363,7 +365,8 @@ function RoleTable() {
 				{selectedRole && (
 					<RoleActivationForm
 						eligibleRole={selectedRole}
-						onSuccess={activatedRole => {
+						onSuccess={(activatedRole) => {
+							// TODO: Publish the activatedRole in a way that shows loading state until it's active
 							closeActivationModal()
 						}}
 					/>

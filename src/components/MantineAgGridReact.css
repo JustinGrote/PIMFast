@@ -24,11 +24,28 @@
 } */
 
 .mantineAgGrid .ag-header-cell {
+	/* make header content left-aligned and vertically centered */
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
 	font-weight: 600;
 	color: #ffffff;
 }
 
+/* Ensure header label text is left aligned */
+.mantineAgGrid .ag-header-cell-label,
+.mantineAgGrid .ag-header-cell-label .ag-header-cell-text {
+	justify-content: flex-start;
+	text-align: left;
+}
+
 .mantineAgGrid .ag-cell {
+	/* left align cell content and vertically center it */
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	text-align: left;
+
 	color: #ffffff;
 	border-right: 1px solid #3c3c3c;
 }
