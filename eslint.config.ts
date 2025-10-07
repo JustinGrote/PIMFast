@@ -5,8 +5,33 @@ import eslintConfigPrettier from 'eslint-config-prettier/flat'
 import reactPlugin from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
+import tseslint, { ConfigWithExtends } from 'typescript-eslint'
 import globals from 'globals'
+import unusedImports from 'eslint-plugin-unused-imports'
+
+export type ESLintConfig = Parameters<typeof defineConfig>[0]
+
+/** Configures the unused imports rule to work properly and override no-unused-vars */
+const unusedImportsConfig: ESLintConfig = [
+	{
+		plugins: {
+			'unused-imports': unusedImports,
+		},
+		rules: {
+			'@typescript-eslint/no-unused-vars': 'off',
+			'unused-imports/no-unused-imports': 'warn',
+			'unused-imports/no-unused-vars': [
+				'warn',
+				{
+					vars: 'all',
+					varsIgnorePattern: '^_',
+					args: 'after-used',
+					argsIgnorePattern: '^_',
+				},
+			],
+		},
+	},
+]
 
 export default defineConfig(
 	eslint.configs.recommended,
@@ -17,22 +42,23 @@ export default defineConfig(
 	reactPlugin.configs.flat['jsx-runtime'],
 	reactHooks.configs['recommended-latest'],
 	reactRefresh.configs.vite,
+	unusedImportsConfig,
+
+	// Custom Config
 	{
 		files: ['**/*.{js,mjs,cjs,jsx,mjsx,ts,tsx,mtsx}'],
-    ...reactPlugin.configs.flat.recommended,
-    languageOptions: {
-      ...reactPlugin.configs.flat.recommended.languageOptions,
-      globals: {
-        ...globals.serviceworker,
-        ...globals.browser,
-      },
-    },
-		ignores: ['node_modules', 'dist', 'worker-configuration.d.ts', 'src/api/generated'
-		],
+		...reactPlugin.configs.flat.recommended,
+		languageOptions: {
+			...reactPlugin.configs.flat.recommended.languageOptions,
+			globals: {
+				...globals.serviceworker,
+				...globals.browser,
+			},
+		},
+		ignores: ['node_modules', 'dist', 'worker-configuration.d.ts', 'src/api/generated'],
 		rules: {
-			'@typescript-eslint/no-unused-vars': 'warn',
 			'no-throw-literal': 'error',
-			'@tanstack/query/exhaustive-deps': 'warn'
-		}
-	},
+			'@tanstack/query/exhaustive-deps': 'warn',
+		},
+	}
 )
