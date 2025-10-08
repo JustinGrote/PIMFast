@@ -5,7 +5,7 @@ import eslintConfigPrettier from 'eslint-config-prettier/flat'
 import reactPlugin from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint, { ConfigWithExtends } from 'typescript-eslint'
+import tseslint from 'typescript-eslint'
 import globals from 'globals'
 import unusedImports from 'eslint-plugin-unused-imports'
 
@@ -24,9 +24,9 @@ const unusedImportsConfig: ESLintConfig = [
 				'warn',
 				{
 					vars: 'all',
-					varsIgnorePattern: '^_',
+					varsIgnorePattern: '^_.+?',
 					args: 'after-used',
-					argsIgnorePattern: '^_',
+					argsIgnorePattern: '^_.+?',
 				},
 			],
 		},
