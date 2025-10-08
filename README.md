@@ -40,6 +40,13 @@ This project defines a type known as `EligibleRole` which includes both the acco
 1. A **role assignment schedule instance** defines the current roles a user has. There is a 1:1 relationship with schedules via the `roleAssignmentScheduleId` property. Unlike the eligible equivalent, however, there is no property the other direction, linking a schedule to a schedule instance. It also has the `linkedRoleEligibilityScheduleId`.
 1. Assignment schedules and instances can be queried to determine which roles are currently active, scheduled for future activation, or eligible for activation.
 
+#### Quirks
+
+1. On an Az Role Assignment Schedule, the `linkedRoleEligibilityScheduleId` is only populated if the activation is in the future. The status should not be "Provisioned"
+1. If a role assignment schedule has status of provisioned, there should be an instance present
+1. Az role assignment schedules and their instances seem to have the same GUID. Not sure if this behavior can be relied upon, probably better to get a list of instances and check the property of the related schedule.
+1. When a role is assigned, the originRoleAssignmentId appears to point to a hidden role assignment where the access is actually provisioned, but this is not queryable via the API.
+
 #### Additional Notes
 
 - PIMFast uses the Azure REST API for all PIM operations, including listing eligible roles, activating roles, and viewing assignment history.

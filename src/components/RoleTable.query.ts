@@ -1,29 +1,44 @@
 import { getMilliseconds } from '@/api/time';
-import { CommonRoleAssignmentScheduleInstance } from '@/model/CommonRoleAssignmentScheduleInstance';
-import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule';
-import { EligibleRole } from '@/model/EligibleRole';
-import { KnownStatus } from '@azure/arm-authorization';
-import { IPublicClientApplication } from '@azure/msal-browser';
+import { toRecord } from '@/api/util'
 import {
-	useMutation,
-	useQueries,
-	useQuery,
-	useQueryClient,
-	UseQueryResult,
-} from '@tanstack/react-query';
-import dayjs from 'dayjs';
-import { deactivateEligibleRole, getMyRoleEligibilitySchedules } from '../api/pim';
+	CommonRoleAssignmentSchedule,
+	fromArmAssignmentSchedule,
+	fromGraphAssignmentSchedule,
+	fromGroupAssignmentSchedule,
+} from '@/model/CommonRoleAssignmentSchedule'
 import {
+	CommonRoleAssignmentScheduleInstance,
+	fromArmAssignment,
+	fromGraphAssignment,
+	fromGroupAssignment,
+	PrivilegedAccessGroupAssignmentScheduleInstanceExpanded,
+	UnifiedRoleAssignmentScheduleInstanceExpanded,
+} from '@/model/CommonRoleAssignmentScheduleInstance'
+import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
+import { EligibleRole } from '@/model/EligibleRole'
+import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
+import { useMsal } from '@azure/msal-react'
+import { useMutation, useQueries, useQuery, useQueryClient, UseQueryResult } from '@tanstack/react-query'
+import dayjs from 'dayjs'
+import {
+	deactivateEligibleRole,
+	getMyRoleAssignmentScheduleInstances,
+	getMyRoleAssignmentSchedules,
+	getMyRoleEligibilitySchedules,
+} from '../api/pim'
+import {
+	getMyEntraGroupAssignmentScheduleInstances,
+	getMyEntraGroupAssignmentSchedules,
 	getMyEntraGroupEligibilitySchedules,
+	getMyEntraRoleAssignmentScheduleInstances,
+	getMyEntraRoleAssignmentSchedules,
 	getMyEntraRoleEligibilitySchedules,
-} from '../api/pimGraph';
-import { useMsal } from '@azure/msal-react';
+} from '../api/pimGraph'
 
-export function useRoleTableQueries(instance: IPublicClientApplication) {
+export function useRoleTableQueries() {
 	const refetchInterval = getMilliseconds(30, 'seconds')
 	const queryClient = useQueryClient()
-
-	const {accounts} = useMsal()
+	const { accounts } = useMsal()
 
 	// const { data: accountIds } = useSuspenseQuery({
 	// 	queryKey: ['pim', 'accounts'],
@@ -48,45 +63,51 @@ export function useRoleTableQueries(instance: IPublicClientApplication) {
 	// })
 
 	const armEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accounts.map(account => account.localAccountId).map(accountId => ({
-			queryKey: ['pim', 'armEligibleRoles', accountId],
-			refetchInterval,
-			queryFn: async () => {
-				const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(accountId))
-				return schedules.map<EligibleRole>(schedule => ({
-					accountId: accountId,
-					schedule: fromArmSchedule(schedule),
-				}))
-			},
-		})),
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'armEligibleRoles', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(accountId))
+					return schedules.map<EligibleRole>(schedule => ({
+						accountId: accountId,
+						schedule: fromArmSchedule(schedule),
+					}))
+				},
+			})),
 	})
 
 	const graphEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accounts.map(account => account.localAccountId).map(accountId => ({
-			queryKey: ['pim', 'graphEligibleRoles', accountId],
-			refetchInterval,
-			queryFn: async () => {
-				const schedules = await getMyEntraRoleEligibilitySchedules(accountId)
-				return schedules.map(schedule => ({
-					accountId: accountId,
-					schedule: fromGraphSchedule(schedule),
-				}))
-			},
-		})),
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'graphEligibleRoles', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const schedules = await getMyEntraRoleEligibilitySchedules(accountId)
+					return schedules.map(schedule => ({
+						accountId: accountId,
+						schedule: fromGraphSchedule(schedule),
+					}))
+				},
+			})),
 	})
 
 	const groupEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accounts.map(account => account.localAccountId).map(accountId => ({
-			queryKey: ['pim', 'groupEligibleRoles', accountId],
-			refetchInterval,
-			queryFn: async () => {
-				const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(accountId)
-				return groupScheduleResult.map<EligibleRole>(schedule => ({
-					accountId: accountId,
-					schedule: fromGroupSchedule(schedule),
-				}))
-			},
-		})),
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'groupEligibleRoles', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(accountId)
+					return groupScheduleResult.map<EligibleRole>(schedule => ({
+						accountId: accountId,
+						schedule: fromGroupSchedule(schedule),
+					}))
+				},
+			})),
 	})
 
 	// Simplified: Combine data directly in queryFn, remove verbose enabled check
@@ -97,6 +118,7 @@ export function useRoleTableQueries(instance: IPublicClientApplication) {
 			groupEligibleRolesQueries.every(q => q.isSuccess),
 		queryKey: ['pim', 'eligibleRoles'],
 		queryFn: () => [
+			//BUG: The cast is needed due to an inaccurate type error from useQueries
 			...(armEligibleRolesQueries as UseQueryResult<EligibleRole[]>[]).flatMap(q => q.data ?? []),
 			...(graphEligibleRolesQueries as UseQueryResult<EligibleRole[]>[]).flatMap(q => q.data ?? []),
 			...(groupEligibleRolesQueries as UseQueryResult<EligibleRole[]>[]).flatMap(q => q.data ?? []),
@@ -104,46 +126,131 @@ export function useRoleTableQueries(instance: IPublicClientApplication) {
 	})
 
 	// Assuming roleAssignmentsQuery is meant to be defined similarly; added placeholder for completeness
+	const armRoleScheduleInstances = useQueries<RoleAssignmentScheduleInstance[]>({
+		// TODO: Only run if related Eligible Roles Exist
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'armRoleScheduleInstances', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const instances = await Array.fromAsync(getMyRoleAssignmentScheduleInstances(accountId))
+					return instances
+				},
+			})),
+	})
+
+	const graphRoleScheduleInstances = useQueries<UnifiedRoleAssignmentScheduleInstanceExpanded[]>({
+		// TODO: Only run if related Eligible Roles Exist
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'graphRoleScheduleInstances', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const instances = await getMyEntraRoleAssignmentScheduleInstances(accountId)
+					return instances
+				},
+			})),
+	})
+
+	const groupRoleScheduleInstances = useQueries<PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]>({
+		// TODO: Only run if related Eligible Roles Exist
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'groupRoleScheduleInstances', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const instances = await getMyEntraGroupAssignmentScheduleInstances(accountId)
+					return instances
+				},
+			})),
+	})
+
 	const roleAssignmentsQuery = useQuery<CommonRoleAssignmentScheduleInstance[]>({
-		queryKey: ['pim', 'roleAssignments'],
-		queryFn: async () => {
-			// Placeholder: Implement logic to fetch/combine assignments (e.g., from ARM, Graph, Group)
-			return []
-		},
+		enabled:
+			armRoleScheduleInstances.every(q => q.isSuccess) &&
+			graphRoleScheduleInstances.every(q => q.isSuccess) &&
+			groupRoleScheduleInstances.every(q => q.isSuccess),
+		queryKey: ['pim', 'armRoleAssignmentScheduleInstances'],
+		queryFn: () => [
+			...(armRoleScheduleInstances as UseQueryResult<RoleAssignmentScheduleInstance[]>[])
+				.flatMap(q => q.data ?? [])
+				.map(i => fromArmAssignment(i)),
+			...(graphRoleScheduleInstances as UseQueryResult<UnifiedRoleAssignmentScheduleInstanceExpanded[]>[])
+				.flatMap(q => q.data ?? [])
+				.map(i => fromGraphAssignment(i)),
+			...(groupRoleScheduleInstances as UseQueryResult<PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]>[])
+				.flatMap(q => q.data ?? [])
+				.map(i => fromGroupAssignment(i)),
+		],
+	})
+
+	const armRoleSchedules = useQueries({
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'armRoleSchedules', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const schedules = await Array.fromAsync(getMyRoleAssignmentSchedules(accountId))
+					return schedules
+				},
+			})),
+	})
+
+	const graphRoleSchedules = useQueries({
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'graphRoleSchedules', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const schedules = await getMyEntraRoleAssignmentSchedules(accountId)
+					return schedules
+				},
+			})),
+	})
+
+	const groupRoleSchedules = useQueries({
+		queries: accounts
+			.map(account => account.localAccountId)
+			.map(accountId => ({
+				queryKey: ['pim', 'groupRoleSchedules', accountId],
+				refetchInterval,
+				queryFn: async () => {
+					const schedules = await getMyEntraGroupAssignmentSchedules(accountId)
+					return schedules
+				},
+			})),
+	})
+
+	const roleSchedulesQuery = useQuery<CommonRoleAssignmentSchedule[]>({
+		enabled:
+			armRoleSchedules.every(q => q.isSuccess) &&
+			graphRoleSchedules.every(q => q.isSuccess) &&
+			groupRoleSchedules.every(q => q.isSuccess),
+		queryKey: ['pim', 'roleSchedules'],
+		queryFn: () => [
+			...armRoleSchedules.flatMap(q => q.data ?? []).map(i => fromArmAssignmentSchedule(i)),
+			...graphRoleSchedules.flatMap(q => q.data ?? []).map(i => fromGraphAssignmentSchedule(i)),
+			...groupRoleSchedules.flatMap(q => q.data ?? []).map(i => fromGroupAssignmentSchedule(i)),
+		],
 	})
 
 	type RoleToStatusLookup = Record<EligibleRole['accountId'], CommonRoleAssignmentScheduleInstance | undefined>
+
 	const roleStatusQuery = useQuery<RoleToStatusLookup>({
-		queryKey: ['pim', 'eligibleRoleStatus', eligibleRolesQuery.data, roleAssignmentsQuery.data],
-		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsQuery.isSuccess,
-		queryFn: () => {
-			const roleToStatusLookup: RoleToStatusLookup = {}
-			const roleAssignments = roleAssignmentsQuery.data ?? []
-			const eligibleRoles = eligibleRolesQuery.data ?? []
-
-			for (const role of eligibleRoles) {
-				// Find the matching assignment for this role
-				const matchingAssignment = roleAssignments.find(assignment => {
-					// For ARM roles, match using linkedRoleEligibilityScheduleInstanceId
-					if (role.schedule.sourceType === 'arm' && assignment.sourceType === 'arm') {
-						return assignment.linkedRoleEligibilityScheduleInstanceId === role.schedule.id
-					}
-					// For Graph and Group roles, match by role definition and scope
-					if (role.schedule.sourceType === assignment.sourceType) {
-						return (
-							assignment.roleDefinitionId === role.schedule.roleDefinitionId &&
-							assignment.scope === role.schedule.scope &&
-							assignment.principalId === role.schedule.principalId
-						)
-					}
-					return false
-				})
-
-				roleToStatusLookup[role.accountId] = matchingAssignment
-			}
-
-			return roleToStatusLookup
-		},
+		queryKey: [
+			'pim',
+			'eligibleRoleStatus',
+			eligibleRolesQuery.dataUpdatedAt,
+			roleAssignmentsQuery.dataUpdatedAt,
+			roleSchedulesQuery.dataUpdatedAt,
+		],
+		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsQuery.isSuccess && roleSchedulesQuery.isSuccess,
+		queryFn: () => toRecord(roleAssignmentsQuery.data ?? [], 'id'),
 	})
 
 	const deactivateEligibleRoleMutation = useMutation({
@@ -164,7 +271,7 @@ export function useRoleTableQueries(instance: IPublicClientApplication) {
 	 */
 	function isEligibleRoleActivated(role: EligibleRole): boolean {
 		if (!roleStatusQuery.data) return false
-		const assignment = roleStatusQuery.data[role.accountId]
+		const assignment = roleStatusQuery.data[role.schedule.id]
 		if (!assignment) return false
 
 		// Check status based on source type

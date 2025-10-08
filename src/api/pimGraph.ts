@@ -1,26 +1,29 @@
 import {
-	PrivilegedAccessGroupAssignmentScheduleExpanded,
-	UnifiedRoleAssignmentScheduleExpanded,
-} from '@/model/CommonRoleAssignmentScheduleInstance';
-import { PrivilegedAccessGroupEligibilityScheduleExpanded } from '@/model/CommonRoleSchedule';
-import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole';
-import { AccountInfo } from '@azure/msal-browser';
-import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure';
-import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
-import { AccountInfoHomeId, AccountInfoTokenCredential, getAccountByLocalId } from './auth';
+	PrivilegedAccessGroupAssignmentScheduleInstanceExpanded,
+	UnifiedRoleAssignmentScheduleInstanceExpanded,
+} from '@/model/CommonRoleAssignmentScheduleInstance'
+import { PrivilegedAccessGroupEligibilityScheduleExpanded } from '@/model/CommonRoleSchedule'
+import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole'
+import { AccountInfo } from '@azure/msal-browser'
+import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure'
+import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary'
+import { AccountInfoHomeId, AccountInfoTokenCredential, getAccountByLocalId } from './auth'
 import {
+	PrivilegedAccessGroupAssignmentScheduleInstance,
 	PrivilegedAccessGroupAssignmentScheduleRequest,
 	UnifiedRoleAssignmentScheduleRequest,
 	UnifiedRoleEligibilitySchedule,
-} from './generated/msgraph/models';
-import { createPimGraphClient, PimGraphClient } from './generated/msgraph/pimGraphClient';
+	UnifiedRoleAssignmentSchedule,
+	PrivilegedAccessGroupAssignmentSchedule,
+} from './generated/msgraph/models'
+import { createPimGraphClient, PimGraphClient } from './generated/msgraph/pimGraphClient'
 
 const graphPimClients: Record<AccountInfoHomeId, PimGraphClient> = {}
 
 export function createPimClient(account: AccountInfo): PimGraphClient {
 	try {
 		const client = createPimGraphClient(
-			new FetchRequestAdapter(new AzureIdentityAuthenticationProvider(new AccountInfoTokenCredential(account))),
+			new FetchRequestAdapter(new AzureIdentityAuthenticationProvider(new AccountInfoTokenCredential(account)))
 		)
 		return client
 	} catch (error) {
@@ -54,6 +57,31 @@ export interface UnifiedRoleEligibilityScheduleExpanded extends UnifiedRoleEligi
 	}
 }
 
+export interface UnifiedRoleAssignmentScheduleExpanded extends UnifiedRoleAssignmentSchedule {
+	roleDefinition: {
+		id: string
+		displayName: string
+		userPrincipalName: string
+	}
+	principal: {
+		id: string
+		displayName: string
+		userPrincipalName: string
+	}
+}
+
+export interface PrivilegedAccessGroupAssignmentScheduleExpanded extends PrivilegedAccessGroupAssignmentSchedule {
+	group: {
+		id?: string
+		displayName?: string
+		description?: string
+	}
+	principal: {
+		id?: string
+		displayName?: string
+	}
+}
+
 /**
  * Retrieves the current user's role eligibility schedule instances from Microsoft Graph PIM.
  *
@@ -62,7 +90,7 @@ export interface UnifiedRoleEligibilityScheduleExpanded extends UnifiedRoleEligi
  * @throws Will throw an error if fetching fails.
  */
 export async function getMyEntraRoleEligibilitySchedules(
-	account: AccountInfoOrId,
+	account: AccountInfoOrId
 ): Promise<UnifiedRoleEligibilityScheduleExpanded[]> {
 	try {
 		const client = await getPimClient(account)
@@ -81,8 +109,28 @@ export async function getMyEntraRoleEligibilitySchedules(
 	}
 }
 
+export async function getMyEntraRoleAssignmentSchedules(
+	account: AccountInfoOrId
+): Promise<UnifiedRoleAssignmentScheduleExpanded[]> {
+	try {
+		const client = await getPimClient(account)
+
+		const request = client.roleManagement.directory.roleAssignmentSchedules.filterByCurrentUserWithOn('principal')
+		const response = await request.get({
+			queryParameters: {
+				expand: ['roleDefinition', 'principal'],
+			},
+		})
+
+		return (response?.value as UnifiedRoleAssignmentScheduleExpanded[]) ?? []
+	} catch (error) {
+		console.error('Error fetching role assignment schedules:', error)
+		throw error
+	}
+}
+
 export async function getMyEntraGroupEligibilitySchedules(
-	account: AccountInfoOrId,
+	account: AccountInfoOrId
 ): Promise<PrivilegedAccessGroupEligibilityScheduleExpanded[]> {
 	try {
 		const client = await getPimClient(account)
@@ -102,14 +150,35 @@ export async function getMyEntraGroupEligibilitySchedules(
 	}
 }
 
+export async function getMyEntraGroupAssignmentSchedules(
+	account: AccountInfoOrId
+): Promise<PrivilegedAccessGroupAssignmentScheduleExpanded[]> {
+	try {
+		const client = await getPimClient(account)
+
+		const request =
+			client.identityGovernance.privilegedAccess.group.assignmentSchedules.filterByCurrentUserWithOn('principal')
+		const response = await request.get({
+			queryParameters: {
+				expand: ['group', 'principal'],
+			},
+		})
+
+		return (response?.value as PrivilegedAccessGroupAssignmentScheduleExpanded[]) ?? []
+	} catch (error) {
+		console.error('Error fetching group assignment schedules:', error)
+		throw error
+	}
+}
+
 export const createEntraRoleAssignmentScheduleRequest = (
 	account: AccountInfoOrId,
-	request: UnifiedRoleAssignmentScheduleRequest,
+	request: UnifiedRoleAssignmentScheduleRequest
 ) => getPimClient(account).roleManagement.directory.roleAssignmentScheduleRequests.post(request)
 
 export const createEntraGroupAssignmentScheduleRequest = (
 	account: AccountInfoOrId,
-	request: PrivilegedAccessGroupAssignmentScheduleRequest,
+	request: PrivilegedAccessGroupAssignmentScheduleRequest
 ) => getPimClient(account).identityGovernance.privilegedAccess.group.assignmentScheduleRequests.post(request)
 
 /**
@@ -152,8 +221,8 @@ export const deactivateEntraRoleAssignmentScheduleRequest = async (role: Eligibl
  * @throws Will throw an error if fetching fails.
  */
 export async function getMyEntraRoleAssignmentScheduleInstances(
-	account: AccountInfoOrId,
-): Promise<UnifiedRoleAssignmentScheduleExpanded[]> {
+	account: AccountInfoOrId
+): Promise<UnifiedRoleAssignmentScheduleInstanceExpanded[]> {
 	try {
 		const client = await getPimClient(account)
 
@@ -165,7 +234,7 @@ export async function getMyEntraRoleAssignmentScheduleInstances(
 			},
 		})
 
-		return (response?.value as UnifiedRoleAssignmentScheduleExpanded[]) ?? []
+		return (response?.value as UnifiedRoleAssignmentScheduleInstanceExpanded[]) ?? []
 	} catch (error) {
 		console.error('Error fetching Entra role assignment schedule instances:', error)
 		throw error
@@ -181,14 +250,14 @@ export async function getMyEntraRoleAssignmentScheduleInstances(
  * @throws Will throw an error if fetching fails.
  */
 export async function getMyEntraGroupAssignmentScheduleInstances(
-	account: AccountInfoOrId,
-): Promise<PrivilegedAccessGroupAssignmentScheduleExpanded[]> {
+	account: AccountInfoOrId
+): Promise<PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]> {
 	try {
-		const client = await getPimClient(account)
+		const client = getPimClient(account)
 
 		const request =
 			client.identityGovernance.privilegedAccess.group.assignmentScheduleInstances.filterByCurrentUserWithOn(
-				'principal',
+				'principal'
 			)
 		const response = await request.get({
 			queryParameters: {
@@ -196,7 +265,7 @@ export async function getMyEntraGroupAssignmentScheduleInstances(
 			},
 		})
 
-		return (response?.value as PrivilegedAccessGroupAssignmentScheduleExpanded[]) ?? []
+		return (response?.value as PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]) ?? []
 	} catch (error) {
 		console.error('Error fetching group assignment schedule instances:', error)
 		throw error

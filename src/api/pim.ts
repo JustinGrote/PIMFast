@@ -1,14 +1,29 @@
-import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole';
+import {
+	CommonRoleActivateRequest,
+	fromArmRoleAssignmentScheduleRequest,
+	fromEntraRoleAssignmentScheduleRequest,
+	fromGroupRoleAssignmentScheduleRequest,
+	toArmRoleAssignmentScheduleRequest,
+	toEntraRoleAssignmentScheduleRequest,
+	toGroupRoleAssignmentScheduleRequest,
+} from '@/model/CommonRoleActivateRequest'
+import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole'
 import {
 	AuthorizationManagementClient,
 	RoleAssignmentScheduleInstance,
 	RoleAssignmentScheduleRequest,
 	RoleEligibilitySchedule,
-} from '@azure/arm-authorization';
-import { AccountInfo } from '@azure/msal-browser';
-import { match } from 'ts-pattern';
-import { AccountInfoHomeId, AccountInfoTokenCredential, AccountInfoUniqueId, getAccountByLocalId } from './auth';
-import { throwError } from './util';
+} from '@azure/arm-authorization'
+import { AccountInfo } from '@azure/msal-browser'
+import { match } from 'ts-pattern'
+import { AccountInfoHomeId, AccountInfoTokenCredential, AccountInfoUniqueId, getAccountByLocalId } from './auth'
+import {
+	createEntraGroupAssignmentScheduleRequest,
+	createEntraRoleAssignmentScheduleRequest,
+	deactivateEntraGroupAssignmentScheduleRequest,
+	deactivateEntraRoleAssignmentScheduleRequest,
+} from './pimGraph'
+import { throwError } from './util'
 
 // Scoping to subscription is not needed for the client as we will do it in our requests
 const UNSPECIFIED_SUBSCRIPTION_ID = '00000000-0000-0000-0000-000000000000'
@@ -32,10 +47,7 @@ function getPimClient(account: AccountInfo | AccountInfoUniqueId) {
 	return client
 }
 
-export async function getRoleManagementPolicyAssignments(
-	account: AccountInfo,
-	schedule: RoleEligibilitySchedule,
-) {
+export async function getRoleManagementPolicyAssignments(account: AccountInfo, schedule: RoleEligibilitySchedule) {
 	try {
 		if (!schedule.scope || !schedule.roleDefinitionId) {
 			throw new Error('Schedule is missing scope or roleDefinitionId')
@@ -77,7 +89,6 @@ export async function getRoleManagementPolicyAssignments(
 }
 
 // FIXME: Actually fetch the policy requirements
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function getPolicyRequirements(_account: AccountInfo, _schedule: RoleEligibilitySchedule) {
 	// FIXME: Implement policy requirement fetching logic
 	return {
@@ -94,7 +105,7 @@ export async function getPolicyRequirements(_account: AccountInfo, _schedule: Ro
  */
 export async function getRoleAssignmentScheduleRequest(
 	account: AccountInfo,
-	requestId: RoleAssignmentScheduleRequestId,
+	requestId: RoleAssignmentScheduleRequestId
 ) {
 	const lastSlash = requestId.lastIndexOf('/')
 	const scope = requestId.substring(0, lastSlash)
@@ -113,22 +124,6 @@ export interface EligibleRoleActivationRequest extends RoleAssignmentScheduleReq
 	linkedRoleEligibilityScheduleId: string
 }
 
-import {
-	CommonRoleActivateRequest,
-	fromArmRoleAssignmentScheduleRequest,
-	fromEntraRoleAssignmentScheduleRequest,
-	fromGroupRoleAssignmentScheduleRequest,
-	toArmRoleAssignmentScheduleRequest,
-	toEntraRoleAssignmentScheduleRequest,
-	toGroupRoleAssignmentScheduleRequest,
-} from '@/model/CommonRoleActivateRequest';
-import {
-	createEntraGroupAssignmentScheduleRequest,
-	createEntraRoleAssignmentScheduleRequest,
-	deactivateEntraGroupAssignmentScheduleRequest,
-	deactivateEntraRoleAssignmentScheduleRequest,
-} from './pimGraph';
-
 export async function activateEligibleRole(account: AccountInfoOrId, request: CommonRoleActivateRequest) {
 	return await match(request)
 		// ARM-based role activation (Azure Resource roles)
@@ -136,7 +131,7 @@ export async function activateEligibleRole(account: AccountInfoOrId, request: Co
 			const result = await getPimClient(account).roleAssignmentScheduleRequests.create(
 				req.scope,
 				req.id,
-				toArmRoleAssignmentScheduleRequest(req),
+				toArmRoleAssignmentScheduleRequest(req)
 			)
 			if (!result) {
 				throw new Error('Activating Role completed but no object was returned. This is a bug.')
@@ -201,7 +196,7 @@ export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
 		const armSchedule = schedule.originalSchedule as RoleEligibilitySchedule
 		const scopedAssignments = client.roleAssignmentScheduleInstances.listForScope(
 			armSchedule.scope ?? throwError('Missing schedule scope'),
-			{ filter: MY_ROLES_ONLY },
+			{ filter: MY_ROLES_ONLY }
 		)
 		for await (const assignment of scopedAssignments) {
 			if (assignment.linkedRoleEligibilityScheduleInstanceId === armSchedule.id) {
@@ -223,6 +218,9 @@ export const getMyRoleEligibilitySchedules = (account: AccountInfoOrId, scope: s
 // Instances no longer used for eligibility; prefer schedules above.
 export const getMyRoleEligibilityScheduleInstances = (account: AccountInfoOrId, scope: string = '') =>
 	getPimClient(account).roleEligibilityScheduleInstances.listForScope(scope, { filter: MY_ROLES_ONLY })
+
+export const getMyRoleAssignmentSchedules = (account: AccountInfoOrId, scope: string = '') =>
+	getPimClient(account).roleAssignmentSchedules.listForScope(scope, { filter: MY_ROLES_ONLY })
 
 /** Roles that are either eligible activated or assigned */
 export const getMyRoleAssignmentScheduleInstances = (account: AccountInfoOrId, scope: string = '') =>

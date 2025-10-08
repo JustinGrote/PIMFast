@@ -10,7 +10,7 @@ import {
 } from '@/api/azureResourceId'
 import { fetchManagementGroup } from '@/api/managementGroups'
 import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
-import { throwIfNotError } from '@/api/util'
+import { throwIfNotError, toRecord } from '@/api/util'
 import { EligibleRole } from '@/model/EligibleRole'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
@@ -114,23 +114,6 @@ export class FetchTenantSubscriptionNotFoundError extends Error {
 	}
 }
 
-/**
- * Converts an array of objects into a record using the specified property as the key.
- * @param items The array of objects to convert
- * @param key The property name to use as the key
- */
-function toRecord<T extends Record<string, any>, K extends keyof T>(items: T[], key: K): Record<string, T> {
-	return items.reduce<Record<string, T>>((acc, item) => {
-		const keyValue = item[key]
-		if (typeof keyValue === 'string' && keyValue) {
-			if (acc[keyValue]) {
-				console.warn(`Duplicate key value found: ${keyValue}. Overwriting previous value.`)
-			}
-			acc[keyValue] = item
-		}
-		return acc
-	}, {})
-}
 
 async function fetchTenantIdForEligibleRole(role: EligibleRoleWithOptionalSchedule): Promise<string> {
 	const account: AccountInfo = getAccountByLocalId(role.accountId)

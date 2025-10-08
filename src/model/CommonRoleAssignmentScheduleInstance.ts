@@ -1,15 +1,16 @@
 import {
 	DirectoryObject,
 	Group,
-	PrivilegedAccessGroupAssignmentSchedule,
-	UnifiedRoleAssignmentSchedule,
-} from '@/api/generated/msgraph/models';
-import { RoleAssignmentSchedule } from '@azure/arm-authorization';
+	PrivilegedAccessGroupAssignmentScheduleInstance,
+	UnifiedRoleAssignmentScheduleInstance,
+} from '@/api/generated/msgraph/models'
+import { throwError } from '@/api/util'
+import { RoleAssignmentSchedule } from '@azure/arm-authorization'
 
 /**
  * Expanded interface for UnifiedRoleAssignmentSchedule with populated roleDefinition and principal
  */
-export interface UnifiedRoleAssignmentScheduleExpanded extends UnifiedRoleAssignmentSchedule {
+export interface UnifiedRoleAssignmentScheduleInstanceExpanded extends UnifiedRoleAssignmentScheduleInstance {
 	roleDefinition?: {
 		id?: string
 		displayName?: string
@@ -24,8 +25,8 @@ export interface UnifiedRoleAssignmentScheduleExpanded extends UnifiedRoleAssign
 /**
  * Expanded interface for PrivilegedAccessGroupAssignmentSchedule with populated group and principal
  */
-export interface PrivilegedAccessGroupAssignmentScheduleExpanded
-	extends PrivilegedAccessGroupAssignmentSchedule {
+export interface PrivilegedAccessGroupAssignmentScheduleInstanceExpanded
+	extends PrivilegedAccessGroupAssignmentScheduleInstance {
 	group?: Group & {
 		displayName?: string
 		description?: string
@@ -68,13 +69,13 @@ export interface CommonRoleAssignmentScheduleInstance {
 	endDateTime?: Date
 	/** Assignment status */
 	status?: string
-	/** Linked role eligibility schedule instance ID (ARM only) */
+	/** Linked role eligibility schedule instance ID (ARM and Graph only) */
 	linkedRoleEligibilityScheduleInstanceId?: string
 	/** Original assignment schedule instance for specific operations */
 	originalAssignment:
 		| RoleAssignmentSchedule
-		| UnifiedRoleAssignmentScheduleExpanded
-		| PrivilegedAccessGroupAssignmentScheduleExpanded
+		| UnifiedRoleAssignmentScheduleInstanceExpanded
+		| PrivilegedAccessGroupAssignmentScheduleInstanceExpanded
 	/** Source API type for debugging and specific operations */
 	sourceType: 'arm' | 'graph' | 'group'
 }
@@ -105,21 +106,22 @@ export function fromArmAssignment(assignment: RoleAssignmentSchedule): CommonRol
  * Converts a Microsoft Graph UnifiedRoleAssignmentScheduleExpanded to the common interface.
  */
 export function fromGraphAssignment(
-	assignment: UnifiedRoleAssignmentScheduleExpanded,
+	assignment: UnifiedRoleAssignmentScheduleInstanceExpanded
 ): CommonRoleAssignmentScheduleInstance {
 	return {
-		id: assignment.id ?? '',
+		id: assignment.id ?? throwError('Missing id on Graph assignment, this should not happen.'),
 		scope: assignment.directoryScopeId ?? '/',
 		roleDefinitionId: assignment.roleDefinitionId ?? '',
 		roleDefinitionDisplayName: assignment.roleDefinition?.displayName,
-		scopeDisplayName: assignment.directoryScopeId === '/' ? 'Directory' : (assignment.directoryScopeId ?? undefined),
+		scopeDisplayName: assignment.directoryScopeId === '/' ? 'Directory' : assignment.directoryScopeId ?? undefined,
 		scopeType: assignment.directoryScopeId === '/' ? 'directory' : undefined,
 		principalId: assignment.principalId ?? '',
 		principalDisplayName: assignment.principal?.displayName,
-		startDateTime: assignment.scheduleInfo?.startDateTime ? new Date(assignment.scheduleInfo.startDateTime) : undefined,
-		endDateTime: assignment.scheduleInfo?.expiration?.endDateTime ? new Date(assignment.scheduleInfo.expiration.endDateTime) : undefined,
+		startDateTime: assignment.startDateTime ?? undefined,
+		endDateTime: assignment.endDateTime ?? undefined,
 		status: assignment.assignmentType ?? undefined, // Graph uses assignmentType instead of status
 		originalAssignment: assignment,
+		linkedRoleEligibilityScheduleInstanceId: assignment.activatedUsing?.id ?? undefined,
 		sourceType: 'graph',
 	}
 }
@@ -128,14 +130,14 @@ export function fromGraphAssignment(
  * Converts a Microsoft Graph PrivilegedAccessGroupAssignmentScheduleExpanded to the common interface.
  */
 export function fromGroupAssignment(
-	assignment: PrivilegedAccessGroupAssignmentScheduleExpanded,
+	assignment: PrivilegedAccessGroupAssignmentScheduleInstanceExpanded
 ): CommonRoleAssignmentScheduleInstance {
 	// Access ID determines the role type (owner or member)
 	const roleDisplayName = assignment.accessId === 'owner' ? 'Owner' : 'Member'
 	const groupDisplayName = assignment.group?.displayName ?? 'Unknown Group'
 
 	return {
-		id: assignment.id ?? '',
+		id: assignment.id ?? throwError('Missing id on Group assignment, this should not happen.'),
 		scope: assignment.accessId ?? '',
 		roleDefinitionId: assignment.group?.id ?? '',
 		roleDefinitionDisplayName: `${roleDisplayName} of ${groupDisplayName}`,
@@ -143,10 +145,11 @@ export function fromGroupAssignment(
 		scopeType: 'group',
 		principalId: assignment.principalId ?? '',
 		principalDisplayName: assignment.principal?.displayName,
-		startDateTime: assignment.scheduleInfo?.startDateTime ? new Date(assignment.scheduleInfo.startDateTime) : undefined,
-		endDateTime: assignment.scheduleInfo?.expiration?.endDateTime ? new Date(assignment.scheduleInfo.expiration.endDateTime) : undefined,
+		startDateTime: assignment.startDateTime ?? undefined,
+		endDateTime: assignment.endDateTime ?? undefined,
 		status: assignment.assignmentType ?? undefined, // Group uses assignmentType instead of status
 		originalAssignment: assignment,
+		linkedRoleEligibilityScheduleInstanceId: assignment.activatedUsing?.id ?? undefined,
 		sourceType: 'group',
 	}
 }
