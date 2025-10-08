@@ -1,4 +1,3 @@
-import { getAccountByLocalId } from '@/api/auth'
 import {
 	ChildResourceId,
 	ManagementGroupId,
@@ -10,8 +9,9 @@ import {
 } from '@/api/azureResourceId'
 import { fetchManagementGroup } from '@/api/managementGroups'
 import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
-import { throwIfNotError, toRecord } from '@/api/util'
-import { EligibleRole } from '@/model/EligibleRole'
+import { throwError, throwIfNotError, toRecord } from '@/api/util'
+import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
@@ -25,22 +25,17 @@ import { match, P } from 'ts-pattern'
 type Tenant = Pick<TenantIdDescription, 'tenantId' | 'displayName' | 'defaultDomain' | 'domains'>
 
 /**
- * EligibleRole type with optional schedule property.
+ * Renders the resolved tenant display name for the provided schedule.
  */
-export type EligibleRoleWithOptionalSchedule = Omit<EligibleRole, 'schedule'> & Partial<Pick<EligibleRole, 'schedule'>>
-
-/**
- * Renders the resolved tenant display name for either a given accountID or an EligibleRole.
- */
-export default function ResolvedTenantName({ role }: { role: EligibleRoleWithOptionalSchedule }) {
-	// Will be used to fetch external info if required
-	const account: AccountInfo = getAccountByLocalId(role.accountId)
+export default function ResolvedTenantName({ role }: { role: CommonRoleSchedule }) {
+	const account = getCommonRoleScheduleAccount(role)
 
 	const { data: tenantInfoLookup, isSuccess: tenantsFetched } = useSuspenseQuery<Record<string, Tenant>>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
-		queryKey: ['pim', 'tenants', account.localAccountId],
+		queryKey: ['pim', 'tenants', account?.localAccountId ?? 'unknown'],
 		queryFn: async () => {
-			const tenants = await fetchTenants(account)
+			const resolvedAccount = account ?? throwError('Account required to fetch tenant cache')
+			const tenants = await fetchTenants(resolvedAccount)
 			return toRecord(tenants, 'tenantId')
 		},
 		// We will be appending fairly static tenant data to this cache, so it only needs to be fetched once unless it is explicity invalidated
@@ -52,18 +47,20 @@ export default function ResolvedTenantName({ role }: { role: EligibleRoleWithOpt
 		isLoading,
 		error,
 	} = useQuery<Tenant>({
-		queryKey: ['pim', 'tenant', role.accountId, role.schedule?.id],
-		enabled: tenantsFetched,
+		// eslint-disable-next-line @tanstack/query/exhaustive-deps
+		queryKey: ['pim', 'tenant', account?.localAccountId ?? 'unknown', role.id],
+		enabled: tenantsFetched && Boolean(account),
 		retry: false,
 		queryFn: async () => {
-			const tenantId = await fetchTenantIdForEligibleRole(role)
+			const resolvedAccount = account ?? throwError('Account required to fetch tenant info')
+			const tenantId = await fetchTenantIdForSchedule(role, resolvedAccount)
 			if (tenantInfoLookup[tenantId]) {
 				return tenantInfoLookup[tenantId]
 			}
 
 			// If the above is not found, it is almost certainly an external tenantId, so we must use an API to fetch info about it.
 			try {
-				const tenantInfo = await findTenantInformation(getAccountByLocalId(account.localAccountId), tenantId)
+				const tenantInfo = await findTenantInformation(resolvedAccount, tenantId)
 				const tenant: Tenant = {
 					...tenantInfo,
 					defaultDomain: tenantInfo.defaultDomainName,
@@ -83,6 +80,10 @@ export default function ResolvedTenantName({ role }: { role: EligibleRoleWithOpt
 			}
 		},
 	})
+
+	if (!account) {
+		return <Text c="yellow">Unknown account</Text>
+	}
 
 	if (isLoading) {
 		return <Skeleton>Loading Tenant ID</Skeleton>
@@ -114,16 +115,12 @@ export class FetchTenantSubscriptionNotFoundError extends Error {
 	}
 }
 
-
-async function fetchTenantIdForEligibleRole(role: EligibleRoleWithOptionalSchedule): Promise<string> {
-	const account: AccountInfo = getAccountByLocalId(role.accountId)
-	if (!role.schedule) return account.tenantId // No schedule means no ARM scope, so use account tenant
-
+async function fetchTenantIdForSchedule(role: CommonRoleSchedule, account: AccountInfo): Promise<string> {
 	// For non-ARM scopes, assume no B2B is involved and return the account tenant
 	// FIXME: B2B Maybe?
-	if (role.schedule.sourceType !== 'arm') return getAccountByLocalId(role.accountId).tenantId
+	if (role.sourceType !== 'arm') return account.tenantId
 
-	const resourceId = role.schedule.scope
+	const resourceId = role.scope
 
 	if (resourceId === '/' || resourceId.startsWith('/administrativeUnits/')) {
 		return account.tenantId
@@ -153,7 +150,9 @@ async function fetchTenantIdForEligibleRole(role: EligibleRoleWithOptionalSchedu
 	const subscriptions = await fetchSubscriptions(account)
 	const subscription = subscriptions.find(({ subscriptionId: id }) => id === subscriptionId)
 	if (subscription === undefined) {
-		throw new FetchTenantSubscriptionNotFoundError('Subscription not found in account. Likely the user does not have read access to the subscription.')
+		throw new FetchTenantSubscriptionNotFoundError(
+			'Subscription not found in account. Likely the user does not have read access to the subscription.'
+		)
 	}
 	if (!subscription.tenantId) throw new Error('Management Group does not have a tenantId, this is probably a bug.')
 

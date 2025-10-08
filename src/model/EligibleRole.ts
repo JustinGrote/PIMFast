@@ -1,12 +1,26 @@
 import { AccountInfo } from '@azure/msal-browser'
 import { CommonRoleSchedule } from './CommonRoleSchedule'
 
-/** A role schedule instance and the account which it was fetched from. Needed to preserve context for activation so we know which user the role is valid for */
-export interface EligibleRole {
-	// The local ID of the account
-	accountId: string
-	schedule: CommonRoleSchedule
+const commonRoleScheduleAccountMap = new WeakMap<CommonRoleSchedule, AccountInfo>()
+
+/**
+ * Stores the account associated with a common role schedule.
+ * // schedule - The schedule reference to associate
+ * // account - The account returned from MSAL for the schedule owner
+ */
+export const setCommonRoleScheduleAccount = (schedule: CommonRoleSchedule, account: AccountInfo | undefined) => {
+	if (!account) {
+		commonRoleScheduleAccountMap.delete(schedule)
+		return
+	}
+	commonRoleScheduleAccountMap.set(schedule, account)
 }
+
+/**
+ * Retrieves the account previously associated with a schedule.
+ * // schedule - The schedule reference to lookup
+ */
+export const getCommonRoleScheduleAccount = (schedule: CommonRoleSchedule) => commonRoleScheduleAccountMap.get(schedule)
 
 /** A reduced set of Account Info that redacts sensitive info and has less changes */
 export type AccountInfoDisplay = Pick<

@@ -14,8 +14,8 @@ import {
 	PrivilegedAccessGroupAssignmentScheduleInstanceExpanded,
 	UnifiedRoleAssignmentScheduleInstanceExpanded,
 } from '@/model/CommonRoleAssignmentScheduleInstance'
-import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
-import { EligibleRole } from '@/model/EligibleRole'
+import { CommonRoleSchedule, fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
+import { setCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
 import { useMsal } from '@azure/msal-react'
 import { useMutation, useQueries, useQuery, useQueryClient, UseQueryResult } from '@tanstack/react-query'
@@ -62,66 +62,64 @@ export function useRoleTableQueries() {
 	// 	}
 	// })
 
-	const armEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accounts
-			.map(account => account.localAccountId)
-			.map(accountId => ({
-				queryKey: ['pim', 'armEligibleRoles', accountId],
-				refetchInterval,
-				queryFn: async () => {
-					const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(accountId))
-					return schedules.map<EligibleRole>(schedule => ({
-						accountId: accountId,
-						schedule: fromArmSchedule(schedule),
-					}))
-				},
-			})),
+	const armEligibleRolesQueries = useQueries<CommonRoleSchedule[]>({
+		queries: accounts.map(account => ({
+			queryKey: ['pim', 'armEligibleRoles', account.localAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(account.localAccountId))
+				return schedules.map<CommonRoleSchedule>(schedule => {
+					const commonSchedule = fromArmSchedule(schedule)
+					setCommonRoleScheduleAccount(commonSchedule, account)
+					return commonSchedule
+				})
+			},
+		})),
 	})
 
-	const graphEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accounts
-			.map(account => account.localAccountId)
-			.map(accountId => ({
-				queryKey: ['pim', 'graphEligibleRoles', accountId],
-				refetchInterval,
-				queryFn: async () => {
-					const schedules = await getMyEntraRoleEligibilitySchedules(accountId)
-					return schedules.map(schedule => ({
-						accountId: accountId,
-						schedule: fromGraphSchedule(schedule),
-					}))
-				},
-			})),
+	const graphEligibleRolesQueries = useQueries<CommonRoleSchedule[]>({
+		queries: accounts.map(account => ({
+			queryKey: ['pim', 'graphEligibleRoles', account.localAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const schedules = await getMyEntraRoleEligibilitySchedules(account.localAccountId)
+				return schedules.map(schedule => {
+					const commonSchedule = fromGraphSchedule(schedule)
+					setCommonRoleScheduleAccount(commonSchedule, account)
+					return commonSchedule
+				})
+			},
+		})),
 	})
 
-	const groupEligibleRolesQueries = useQueries<EligibleRole[]>({
-		queries: accounts
-			.map(account => account.localAccountId)
-			.map(accountId => ({
-				queryKey: ['pim', 'groupEligibleRoles', accountId],
-				refetchInterval,
-				queryFn: async () => {
-					const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(accountId)
-					return groupScheduleResult.map<EligibleRole>(schedule => ({
-						accountId: accountId,
-						schedule: fromGroupSchedule(schedule),
-					}))
-				},
-			})),
+	const groupEligibleRolesQueries = useQueries<CommonRoleSchedule[]>({
+		queries: accounts.map(account => ({
+			queryKey: ['pim', 'groupEligibleRoles', account.localAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(account.localAccountId)
+				return groupScheduleResult.map<CommonRoleSchedule>(schedule => {
+					const commonSchedule = fromGroupSchedule(schedule)
+					setCommonRoleScheduleAccount(commonSchedule, account)
+					return commonSchedule
+				})
+			},
+		})),
 	})
 
 	// Simplified: Combine data directly in queryFn, remove verbose enabled check
-	const eligibleRolesQuery = useQuery<EligibleRole[]>({
+	const eligibleRolesQuery = useQuery<CommonRoleSchedule[]>({
 		enabled:
 			armEligibleRolesQueries.every(q => q.isSuccess) &&
 			graphEligibleRolesQueries.every(q => q.isSuccess) &&
 			groupEligibleRolesQueries.every(q => q.isSuccess),
+		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['pim', 'eligibleRoles'],
 		queryFn: () => [
 			//BUG: The cast is needed due to an inaccurate type error from useQueries
-			...(armEligibleRolesQueries as UseQueryResult<EligibleRole[]>[]).flatMap(q => q.data ?? []),
-			...(graphEligibleRolesQueries as UseQueryResult<EligibleRole[]>[]).flatMap(q => q.data ?? []),
-			...(groupEligibleRolesQueries as UseQueryResult<EligibleRole[]>[]).flatMap(q => q.data ?? []),
+			...(armEligibleRolesQueries as UseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
+			...(graphEligibleRolesQueries as UseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
+			...(groupEligibleRolesQueries as UseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
 		],
 	})
 
@@ -173,6 +171,7 @@ export function useRoleTableQueries() {
 			armRoleScheduleInstances.every(q => q.isSuccess) &&
 			graphRoleScheduleInstances.every(q => q.isSuccess) &&
 			groupRoleScheduleInstances.every(q => q.isSuccess),
+		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['pim', 'armRoleAssignmentScheduleInstances'],
 		queryFn: () => [
 			...(armRoleScheduleInstances as UseQueryResult<RoleAssignmentScheduleInstance[]>[])
@@ -239,7 +238,7 @@ export function useRoleTableQueries() {
 		],
 	})
 
-	type RoleToStatusLookup = Record<EligibleRole['accountId'], CommonRoleAssignmentScheduleInstance | undefined>
+	type RoleToStatusLookup = Record<string, CommonRoleAssignmentScheduleInstance | undefined>
 
 	const roleStatusQuery = useQuery<RoleToStatusLookup>({
 		// Key is too big, use last update instead ATM
@@ -269,9 +268,9 @@ export function useRoleTableQueries() {
 	 * Checks if an eligible role is activated.
 	 * @param role The eligible role to check.
 	 */
-	function isEligibleRoleActivated(role: EligibleRole): boolean {
+	function isEligibleRoleActivated(schedule: CommonRoleSchedule): boolean {
 		if (!roleStatusQuery.data) return false
-		const assignment = roleStatusQuery.data[role.schedule.id]
+		const assignment = roleStatusQuery.data[schedule.id]
 		if (!assignment) return false
 
 		// Check status based on source type
@@ -288,10 +287,10 @@ export function useRoleTableQueries() {
 	 * Checks if an eligible role was newly activated (less than 5 minutes ago).
 	 * @param role The eligible role to check.
 	 */
-	function isEligibleRoleNewlyActivated(role: EligibleRole): boolean {
+	function isEligibleRoleNewlyActivated(schedule: CommonRoleSchedule): boolean {
 		const AZURE_PIM_MIN_ACTIVATION_TIME = 5
 		if (!roleStatusQuery.data) return false
-		const assignment = roleStatusQuery.data[role.accountId]
+		const assignment = roleStatusQuery.data[schedule.id]
 		if (!assignment || !assignment.startDateTime) return false
 		return dayjs().diff(dayjs(assignment.startDateTime), 'minutes') < AZURE_PIM_MIN_ACTIVATION_TIME
 	}

@@ -1,24 +1,24 @@
-import { getAccountByLocalId } from '@/api/auth';
-import { activateEligibleRole } from '@/api/pim';
-import { throwError } from '@/api/util';
-import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest';
-import { EligibleRole } from '@/model/EligibleRole';
-import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core';
-import { DateTimePicker } from '@mantine/dates';
-import { useForm } from '@mantine/form';
-import { useDisclosure } from '@mantine/hooks';
-import { IconCheck } from '@tabler/icons-react';
-import { useMutation } from '@tanstack/react-query';
-import dayjs from 'dayjs';
-import durationPlugin from 'dayjs/plugin/duration';
-import { humanizer } from 'humanize-duration';
-import { useState } from 'react';
+import { activateEligibleRole } from '@/api/pim'
+import { throwError } from '@/api/util'
+import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest'
+import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
+import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
+import { DateTimePicker } from '@mantine/dates'
+import { useForm } from '@mantine/form'
+import { useDisclosure } from '@mantine/hooks'
+import { IconCheck } from '@tabler/icons-react'
+import { useMutation } from '@tanstack/react-query'
+import dayjs from 'dayjs'
+import durationPlugin from 'dayjs/plugin/duration'
+import { humanizer } from 'humanize-duration'
+import { useState } from 'react'
 
 dayjs.extend(durationPlugin)
 
 interface RoleActivationFormProps {
-	/** The eligible role to create an activation request for */
-	eligibleRole: EligibleRole
+	/** The schedule to create an activation request for */
+	schedule: CommonRoleSchedule
 	/** Called when the form is successfully submitted */
 	onSuccess?: (request: CommonRoleActivateRequest) => void
 	/** Called when the form submission fails */
@@ -49,13 +49,14 @@ interface PolicyRequirements {
  * Uses @mantine/form for form state management and validation.
  */
 export function RoleActivationForm({
-	eligibleRole,
+	schedule,
 	policyRequirements: customPolicyRequirements,
 	onSuccess: onActivateRoleSuccess,
 	onError,
 }: RoleActivationFormProps) {
 	const [errorModalOpened, { open: openErrorModal, close: closeErrorModal }] = useDisclosure(false)
 	const [errorMessage, setErrorMessage] = useState('')
+	const account = getCommonRoleScheduleAccount(schedule)
 
 	const form = useForm<FormValues>({
 		mode: 'uncontrolled',
@@ -84,9 +85,12 @@ export function RoleActivationForm({
 	const maxDurationMinutes = dayjs.duration(policyRequirements.maxDuration).asMinutes()
 
 	const activationMutation = useMutation({
-		mutationKey: ['activateRole', eligibleRole.schedule.id],
+		mutationKey: ['activateRole', schedule.id],
 		mutationFn: async (activationRequest: CommonRoleActivateRequest) =>
-			await activateEligibleRole(eligibleRole.accountId, activationRequest),
+			await activateEligibleRole(
+				account ?? throwError('Account mapping missing for activation mutation'),
+				activationRequest
+			),
 		onSuccess: result => {
 			console.debug(`Submitted Activation Request ${result.id} for role ${result.roleDefinitionId}`)
 			if (onActivateRoleSuccess) onActivateRoleSuccess(result)
@@ -114,10 +118,16 @@ export function RoleActivationForm({
 		activationMutation.mutate(activationRequest)
 	}
 
-	function newActivationRequest(
-		{ durationMinutes, justification, startTime, ticketNumber }: FormValues,
-		{ accountId, schedule }: EligibleRole = eligibleRole,
-	): CommonRoleActivateRequest {
+	function newActivationRequest({
+		durationMinutes,
+		justification,
+		startTime,
+		ticketNumber,
+	}: FormValues): CommonRoleActivateRequest {
+		if (!account) {
+			throwError('Account context missing for activation request')
+		}
+
 		return {
 			requestType: 'SelfActivate',
 			sourceType: schedule.sourceType,
@@ -128,10 +138,16 @@ export function RoleActivationForm({
 			linkedRoleEligibilityScheduleId: schedule.id,
 			roleDefinitionId: schedule.roleDefinitionId,
 			startDateTime: startTime || new Date(),
-			endDateTime: dayjs(startTime || new Date()).add(durationMinutes + .1, 'minutes').toDate(),
+			endDateTime: dayjs(startTime || new Date())
+				.add(durationMinutes + 0.1, 'minutes')
+				.toDate(),
 			//INFO: The principal should always the be user making the request for SelfActivate
-			principalId: getAccountByLocalId(accountId).localAccountId,
+			principalId: account.localAccountId,
 		}
+	}
+
+	if (!account) {
+		return <Text c="red">Unable to resolve account for the selected role. Please refresh and try again.</Text>
 	}
 
 	return (
@@ -147,13 +163,13 @@ export function RoleActivationForm({
 							size="sm"
 							c="dimmed"
 						>
-							Role: {eligibleRole.schedule.roleDefinitionDisplayName ?? 'Unknown Role'}
+							Role: {schedule.roleDefinitionDisplayName ?? 'Unknown Role'}
 						</Text>
 						<Text
 							size="sm"
 							c="dimmed"
 						>
-							Scope: {eligibleRole.schedule.scopeDisplayName ?? eligibleRole.schedule.scope ?? 'Unknown Scope'}
+							Scope: {schedule.scopeDisplayName ?? schedule.scope ?? 'Unknown Scope'}
 						</Text>
 					</Group>
 

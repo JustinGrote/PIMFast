@@ -1,8 +1,8 @@
-import { getAccountByLocalId } from '@/api/auth';
 import { getAzurePortalUrl } from '@/api/azureResourceId'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { EligibleRole } from '@/model/EligibleRole'
+import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
@@ -11,7 +11,7 @@ import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
@@ -25,13 +25,12 @@ dayjs.extend(relativeTimePlugin)
 
 function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
-	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
-	const [gridApi, setGridApi] = useState<GridApi<EligibleRole> | null>(null)
+	const [selectedRole, setSelectedRole] = useState<CommonRoleSchedule | null>(null)
+	const [gridApi, setGridApi] = useState<GridApi<CommonRoleSchedule> | null>(null)
 	const [filterQuery, setFilterQuery] = useState('')
 
 	const {
 		accountIds,
-		currentTab,
 		eligibleRolesQuery,
 		roleStatusQuery,
 		deactivateEligibleRoleMutation,
@@ -40,16 +39,26 @@ function RoleTable() {
 		isEligibleRoleNewlyActivated,
 	} = useRoleTableQueries()
 
-	const columnDefs: ColDef<EligibleRole>[] = useMemo(
+	const handleActivateClick = useCallback(
+		(eligibleRole: CommonRoleSchedule) => {
+			setSelectedRole(eligibleRole)
+			if (!isEligibleRoleActivated(eligibleRole)) {
+				openActivationModal()
+			} else {
+				deactivateEligibleRoleMutation.mutate(eligibleRole)
+			}
+		},
+		[deactivateEligibleRoleMutation, isEligibleRoleActivated, openActivationModal]
+	)
+
+	const columnDefs: ColDef<CommonRoleSchedule>[] = useMemo(
 		() => [
 			{
-				field: 'schedule.roleDefinitionDisplayName',
+				field: 'roleDefinitionDisplayName',
 				headerName: 'Role',
-				cellRenderer: (params: { data: EligibleRole }) => (
+				cellRenderer: (params: { data: CommonRoleSchedule }) => (
 					<div>
-						<span title={params.data.schedule.roleDefinitionId || ''}>
-							{params.data.schedule.roleDefinitionDisplayName ?? 'unknown'}
-						</span>
+						<span title={params.data.roleDefinitionId || ''}>{params.data.roleDefinitionDisplayName ?? 'unknown'}</span>
 					</div>
 				),
 				flex: 2,
@@ -58,17 +67,16 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Scope',
-				cellRenderer: (params: { data: EligibleRole }) => {
-					const { schedule } = params.data
-					const icon = match(schedule.scopeType)
+				cellRenderer: (params: { data: CommonRoleSchedule }) => {
+					const icon = match(params.data.scopeType)
 						.with('resourcegroup', () => <ResourceGroups />)
 						.with('subscription', () => <Subscriptions />)
 						.with('managementgroup', () => <ManagementGroups />)
 						.with('directory', () => <EntraConnect />)
 						.with('group', () => <Groups />)
 						.otherwise(() => <AzureResource />)
-					const displayName = schedule.scopeDisplayName ?? 'unknown'
-					const portalUrl = schedule.scope ? getAzurePortalUrl(schedule.scope, schedule.scopeType) : '#'
+					const displayName = params.data.scopeDisplayName ?? 'unknown'
+					const portalUrl = params.data.scope ? getAzurePortalUrl(params.data.scope, params.data.scopeType) : '#'
 
 					return (
 						<Group
@@ -81,7 +89,7 @@ function RoleTable() {
 								href={portalUrl}
 								target="_blank"
 								rel="noopener noreferrer"
-								title={schedule.scope ?? ''}
+								title={params.data.scope ?? ''}
 								style={{
 									textDecoration: 'none',
 									color: 'inherit',
@@ -100,12 +108,16 @@ function RoleTable() {
 				flex: 2,
 				sortable: true,
 				resizable: true,
-				valueGetter: params => params.data?.schedule.scopeDisplayName || '',
+				valueGetter: params => params.data?.scopeDisplayName || '',
 			},
 			{
 				headerName: 'Account',
-				cellRenderer: (params: { data: EligibleRole }) => {
-					const { name, username } = getAccountByLocalId(params.data.accountId)
+				cellRenderer: (params: { data: CommonRoleSchedule }) => {
+					const account = getCommonRoleScheduleAccount(params.data)
+					if (!account) {
+						return <Text size="sm">Unknown account</Text>
+					}
+					const { name, username } = account
 					return (
 						<Text
 							size="sm"
@@ -120,24 +132,25 @@ function RoleTable() {
 				resizable: true,
 				hide: accountIds.length <= 1,
 				valueGetter: params => {
-					if (!params.data?.accountId) {
+					const account = params.data ? getCommonRoleScheduleAccount(params.data) : undefined
+					if (!account) {
 						return ''
 					}
-					return getAccountByLocalId(params.data.accountId).name
+					return account.name
 				},
 			},
 			{
 				headerName: 'Tenant',
-				cellRenderer: (params: { data: EligibleRole }) => <ResolvedTenantName role={params.data} />,
+				cellRenderer: (params: { data: CommonRoleSchedule }) => <ResolvedTenantName role={params.data} />,
 				flex: 1,
 				sortable: false,
 				resizable: true,
 			},
 			{
 				headerName: 'Status',
-				cellRenderer: (params: { data: EligibleRole }) => {
+				cellRenderer: (params: { data: CommonRoleSchedule }) => {
 					const isActivated = isEligibleRoleActivated(params.data)
-					const roleStatus = roleStatusQuery.data?.[params.data.schedule.id]
+					const roleStatus = roleStatusQuery.data?.[params.data.id]
 
 					if (isActivated && roleStatus?.endDateTime) {
 						return (
@@ -150,9 +163,9 @@ function RoleTable() {
 						)
 					}
 
-					return params.data.schedule.endDateTime ? (
+					return params.data.endDateTime ? (
 						<Center>
-							<ExpiresCountdown futureDate={params.data.schedule.endDateTime} />
+							<ExpiresCountdown futureDate={params.data.endDateTime} />
 						</Center>
 					) : (
 						<Center>
@@ -169,7 +182,7 @@ function RoleTable() {
 				width: 100,
 				sortable: false,
 				resizable: true,
-				valueGetter: params => params.data?.schedule.endDateTime || '',
+				valueGetter: params => params.data?.endDateTime || '',
 				suppressColumnsToolPanel: true,
 				lockVisible: true,
 			},
@@ -180,7 +193,7 @@ function RoleTable() {
 						<IconClick size={16} />
 					</Center>
 				),
-				cellRenderer: (params: { data: EligibleRole }) => (
+				cellRenderer: (params: { data: CommonRoleSchedule }) => (
 					<div className="one-line-row">
 						<Group>
 							<ActionIcon
@@ -221,29 +234,28 @@ function RoleTable() {
 				resizable: false,
 			},
 		],
-		[roleStatusQuery.isSuccess, currentTab, isEligibleRoleActivated, isEligibleRoleNewlyActivated]
+		[
+			accountIds.length,
+			handleActivateClick,
+			isEligibleRoleActivated,
+			isEligibleRoleNewlyActivated,
+			roleStatusQuery.data,
+			roleStatusQuery.isSuccess,
+		]
 	)
-
-	async function handleActivateClick(eligibleRole: EligibleRole) {
-		setSelectedRole(eligibleRole)
-		if (!isEligibleRoleActivated(eligibleRole)) {
-			openActivationModal()
-		} else {
-			deactivateEligibleRoleMutation.mutate(eligibleRole)
-		}
-	}
 
 	// Filter the eligible roles based on search query
 	const filteredRoles = useMemo(() => {
-		let filtered: EligibleRole[] = eligibleRolesQuery.data ?? []
+		let filtered: CommonRoleSchedule[] = eligibleRolesQuery.data ?? []
 
 		// Apply search filter
 		if (filterQuery) {
 			const lowerQuery = filterQuery.toLowerCase()
 			filtered = filtered.filter(role => {
-				const accountName = getAccountByLocalId(role.accountId).name?.toLowerCase() || ''
-				const roleName = role.schedule.roleDefinitionDisplayName?.toLowerCase() || ''
-				const scopeName = role.schedule.scopeDisplayName?.toLowerCase() || ''
+				const account = getCommonRoleScheduleAccount(role)
+				const accountName = account?.name?.toLowerCase() || ''
+				const roleName = role.roleDefinitionDisplayName?.toLowerCase() || ''
+				const scopeName = role.scopeDisplayName?.toLowerCase() || ''
 				// TODO: Fix tenant search
 
 				return (
@@ -256,7 +268,7 @@ function RoleTable() {
 		return filtered
 	}, [filterQuery, eligibleRolesQuery.data])
 
-	const onGridReady = (params: GridReadyEvent<EligibleRole>) => {
+	const onGridReady = (params: GridReadyEvent<CommonRoleSchedule>) => {
 		setGridApi(params.api)
 	}
 
@@ -332,12 +344,12 @@ function RoleTable() {
 					/>
 
 					<div style={{ height: 'calc(100vh - 200px)', width: '100%', position: 'relative', minHeight: '400px' }}>
-						<MantineAgGridReact<EligibleRole>
+						<MantineAgGridReact<CommonRoleSchedule>
 							className="roleTable"
 							loading={eligibleRolesQuery.isLoading}
 							rowData={filteredRoles}
 							columnDefs={columnDefs}
-							getRowId={params => params.data.schedule.id}
+							getRowId={params => params.data.id}
 							onGridReady={onGridReady}
 							// getRowStyle={getRowStyle}
 							domLayout="normal"
@@ -361,7 +373,7 @@ function RoleTable() {
 			>
 				{selectedRole && (
 					<RoleActivationForm
-						eligibleRole={selectedRole}
+						schedule={selectedRole}
 						onSuccess={_activatedRole => {
 							// TODO: Publish the activatedRole in a way that shows loading state until it's active
 							closeActivationModal()

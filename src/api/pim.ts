@@ -7,7 +7,8 @@ import {
 	toEntraRoleAssignmentScheduleRequest,
 	toGroupRoleAssignmentScheduleRequest,
 } from '@/model/CommonRoleActivateRequest'
-import { AccountInfoOrId, EligibleRole } from '@/model/EligibleRole'
+import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { AccountInfoOrId, getCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import {
 	AuthorizationManagementClient,
 	RoleAssignmentScheduleInstance,
@@ -159,9 +160,9 @@ export async function activateEligibleRole(account: AccountInfoOrId, request: Co
 		})
 }
 
-export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
-	const { accountId, schedule } = eligibleRole
-	const client = getPimClient(accountId)
+export async function deactivateEligibleRole(schedule: CommonRoleSchedule) {
+	const account = getCommonRoleScheduleAccount(schedule) ?? throwError('Account missing for schedule deactivation')
+	const client = getPimClient(account)
 
 	// For ARM-based schedules, we need the original schedule
 	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
@@ -170,15 +171,15 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 		if (!armSchedule.id) throwError('id doesnt exist')
 		return await client.roleAssignmentScheduleRequests.create(armSchedule.scope, crypto.randomUUID(), {
 			requestType: 'SelfDeactivate',
-			principalId: accountId,
+			principalId: account.localAccountId,
 			roleDefinitionId: armSchedule.roleDefinitionId,
 		})
 	} else if (schedule.sourceType === 'graph' && schedule.originalSchedule) {
 		// Entra ID directory role deactivation
-		return await deactivateEntraRoleAssignmentScheduleRequest(eligibleRole)
+		return await deactivateEntraRoleAssignmentScheduleRequest(schedule)
 	} else if (schedule.sourceType === 'group' && schedule.originalSchedule) {
 		// Group role deactivation
-		return await deactivateEntraGroupAssignmentScheduleRequest(eligibleRole)
+		return await deactivateEntraGroupAssignmentScheduleRequest(schedule)
 	} else {
 		const roleType =
 			schedule.sourceType === 'graph' ? 'Entra ID' : schedule.sourceType === 'group' ? 'Group' : 'Non-ARM'
@@ -187,9 +188,9 @@ export async function deactivateEligibleRole(eligibleRole: EligibleRole) {
 }
 
 /** Check a role status by fetching its request and seeing if it links back to the schedule */
-export async function getEligibleRoleAssignment(eligibleRole: EligibleRole) {
-	const { accountId, schedule } = eligibleRole
-	const client = getPimClient(accountId)
+export async function getEligibleRoleAssignment(schedule: CommonRoleSchedule) {
+	const account = getCommonRoleScheduleAccount(schedule) ?? throwError('Account missing for assignment lookup')
+	const client = getPimClient(account)
 
 	// For ARM-based schedules, we need the original schedule
 	if (schedule.sourceType === 'arm' && schedule.originalSchedule) {
