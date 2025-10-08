@@ -242,15 +242,15 @@ export function useRoleTableQueries() {
 	type RoleToStatusLookup = Record<EligibleRole['accountId'], CommonRoleAssignmentScheduleInstance | undefined>
 
 	const roleStatusQuery = useQuery<RoleToStatusLookup>({
-		queryKey: [
-			'pim',
-			'eligibleRoleStatus',
-			eligibleRolesQuery.dataUpdatedAt,
-			roleAssignmentsQuery.dataUpdatedAt,
-			roleSchedulesQuery.dataUpdatedAt,
-		],
-		enabled: eligibleRolesQuery.isSuccess && roleAssignmentsQuery.isSuccess && roleSchedulesQuery.isSuccess,
-		queryFn: () => toRecord(roleAssignmentsQuery.data ?? [], 'id'),
+		// Key is too big, use last update instead ATM
+		// eslint-disable-next-line @tanstack/query/exhaustive-deps
+		queryKey: ['pim', 'eligibleRoleStatus', roleAssignmentsQuery.dataUpdatedAt],
+		enabled: roleAssignmentsQuery.isSuccess,
+		queryFn: () =>
+			toRecord(
+				(roleAssignmentsQuery.data ?? []).filter(x => x.linkedRoleEligibilityScheduleInstanceId),
+				'linkedRoleEligibilityScheduleInstanceId'
+			),
 	})
 
 	const deactivateEligibleRoleMutation = useMutation({
@@ -300,6 +300,7 @@ export function useRoleTableQueries() {
 		accountIds: accounts.map(account => account.localAccountId),
 		currentTab: undefined, // Placeholder as currentTab logic is commented out
 		eligibleRolesQuery,
+		roleSchedulesQuery,
 		roleAssignmentsQuery,
 		roleStatusQuery,
 		deactivateEligibleRoleMutation,

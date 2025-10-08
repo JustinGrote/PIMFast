@@ -1,24 +1,22 @@
 import { getAccountByLocalId } from '@/api/auth';
-import { getAzurePortalUrl, getResourceIdFromPortalUrl } from '@/api/azureResourceId';
-import { throwIfNotError } from '@/api/util';
-import { AzureResource } from '@/components/icons/AzureResource';
-import { RoleActivationForm } from '@/components/RoleActivationForm';
-import { EligibleRole } from '@/model/EligibleRole';
-import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react';
-import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons';
-import { ColDef, GridApi, GridReadyEvent, RowClassParams } from 'ag-grid-community';
-import dayjs from 'dayjs';
-import durationPlugin from 'dayjs/plugin/duration';
-import relativeTimePlugin from 'dayjs/plugin/relativeTime';
-import { useMemo, useState } from 'react';
-import { match } from 'ts-pattern';
-import ExpiresCountdown from './ExpiresCountdown';
-import MantineAgGridReact from './MantineAgGridReact';
-import ResolvedTenantName from './ResolvedTenantName';
-import { useRoleTableQueries } from './RoleTable.query';
-import { useMsal } from '@azure/msal-react';
+import { getAzurePortalUrl } from '@/api/azureResourceId'
+import { AzureResource } from '@/components/icons/AzureResource'
+import { RoleActivationForm } from '@/components/RoleActivationForm'
+import { EligibleRole } from '@/model/EligibleRole'
+import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
+import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
+import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
+import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
+import dayjs from 'dayjs'
+import durationPlugin from 'dayjs/plugin/duration'
+import relativeTimePlugin from 'dayjs/plugin/relativeTime'
+import { useMemo, useState } from 'react'
+import { match } from 'ts-pattern'
+import ExpiresCountdown from './ExpiresCountdown'
+import MantineAgGridReact from './MantineAgGridReact'
+import ResolvedTenantName from './ResolvedTenantName'
+import { useRoleTableQueries } from './RoleTable.query'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -30,7 +28,6 @@ function RoleTable() {
 	const [selectedRole, setSelectedRole] = useState<EligibleRole | null>(null)
 	const [gridApi, setGridApi] = useState<GridApi<EligibleRole> | null>(null)
 	const [filterQuery, setFilterQuery] = useState('')
-	const {instance} = useMsal()
 
 	const {
 		accountIds,
@@ -41,7 +38,7 @@ function RoleTable() {
 		refresh,
 		isEligibleRoleActivated,
 		isEligibleRoleNewlyActivated,
-	} = useRoleTableQueries(instance)
+	} = useRoleTableQueries()
 
 	const columnDefs: ColDef<EligibleRole>[] = useMemo(
 		() => [
@@ -140,7 +137,7 @@ function RoleTable() {
 				headerName: 'Status',
 				cellRenderer: (params: { data: EligibleRole }) => {
 					const isActivated = isEligibleRoleActivated(params.data)
-					const roleStatus = roleStatusQuery.data?.[params.data.accountId]
+					const roleStatus = roleStatusQuery.data?.[params.data.schedule.id]
 
 					if (isActivated && roleStatus?.endDateTime) {
 						return (
@@ -224,7 +221,7 @@ function RoleTable() {
 				resizable: false,
 			},
 		],
-		[roleStatusQuery.isSuccess, currentTab, isEligibleRoleActivated, isEligibleRoleNewlyActivated],
+		[roleStatusQuery.isSuccess, currentTab, isEligibleRoleActivated, isEligibleRoleNewlyActivated]
 	)
 
 	async function handleActivateClick(eligibleRole: EligibleRole) {
@@ -365,7 +362,7 @@ function RoleTable() {
 				{selectedRole && (
 					<RoleActivationForm
 						eligibleRole={selectedRole}
-						onSuccess={(activatedRole) => {
+						onSuccess={_activatedRole => {
 							// TODO: Publish the activatedRole in a way that shows loading state until it's active
 							closeActivationModal()
 						}}

@@ -46,6 +46,7 @@ This project defines a type known as `EligibleRole` which includes both the acco
 1. If a role assignment schedule has status of provisioned, there should be an instance present
 1. Az role assignment schedules and their instances seem to have the same GUID. Not sure if this behavior can be relied upon, probably better to get a list of instances and check the property of the related schedule.
 1. When a role is assigned, the originRoleAssignmentId appears to point to a hidden role assignment where the access is actually provisioned, but this is not queryable via the API.
+1. It appears there will only ever be one `AssignmentScheduleInstance` per `RoleEligibilitySchedule`, which makes sense as it generally will not allow overlaps in schedule. PIMFast relies on this behavior for determining role status.
 
 #### Additional Notes
 

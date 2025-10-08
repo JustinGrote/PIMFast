@@ -24,7 +24,7 @@ export function throwError(message: string | string[], cause?: string): never {
  * @param items The array of objects to convert
  * @param key The property name to use as the key
  */
-export function toRecord<T extends Record<string, any>, K extends keyof T>(items: T[], key: K): Record<string, T> {
+export function toRecord<T, K extends keyof T>(items: T[], key: K): Record<string, T> {
 	return items.reduce<Record<string, T>>((acc, item) => {
 		const keyValue = item[key]
 		if (typeof keyValue === 'string' && keyValue) {
@@ -32,6 +32,8 @@ export function toRecord<T extends Record<string, any>, K extends keyof T>(items
 				console.warn(`Duplicate key value found: ${keyValue}. Overwriting previous value.`)
 			}
 			acc[keyValue] = item
+		} else {
+			throw new Error(`The key property "${String(key)}" is missing or not a string on item: ${JSON.stringify(item)}`)
 		}
 		return acc
 	}, {})
