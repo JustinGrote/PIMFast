@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "publish": "vite publish",
+    "deploy-worker": "pnpm build && wrangler deploy",
     "types": "pnpm wrangler types",
     "postinstall": "pnpm installChrome",
     "installChrome": "pwsh -c \"$chrome=(pnpm dlx @puppeteer/browsers install chrome --path .browsers).split(' ')[1];New-Item -ItemType SymbolicLink -Path '.browsers/chrome-testing' -Target (Join-Path $PWD (Split-Path $chrome)) -Force\"",

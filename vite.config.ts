@@ -1,12 +1,25 @@
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vite'
+import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react-swc'
 import path from 'node:path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+	build: {
+		chunkSizeWarningLimit: 2048, // Matches PWA prefetch manifest limit
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					generated: ['@/api/generated/msgraph/pimGraphClient'],
+					'ag-grid': ['ag-grid-community', 'ag-grid-react'],
+				},
+			},
+		},
+	},
 	plugins: [
 		react(),
+		cloudflare(),
 		VitePWA({
 			registerType: 'autoUpdate',
 			injectRegister: false,
