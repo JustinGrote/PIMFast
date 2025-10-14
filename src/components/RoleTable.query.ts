@@ -1,4 +1,4 @@
-import { getMilliseconds } from '@/api/time';
+import { getMilliseconds } from '@/api/time'
 import { toRecord } from '@/api/util'
 import {
 	CommonRoleAssignmentSchedule,
@@ -18,7 +18,14 @@ import { CommonRoleSchedule, fromArmSchedule, fromGraphSchedule, fromGroupSchedu
 import { setCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { KnownStatus, RoleAssignmentScheduleInstance } from '@azure/arm-authorization'
 import { useMsal } from '@azure/msal-react'
-import { useMutation, useQueries, useQuery, useQueryClient, UseQueryResult } from '@tanstack/react-query'
+import {
+	useMutation,
+	useQueryClient,
+	UseQueryResult,
+	useSuspenseQueries,
+	useSuspenseQuery,
+	UseSuspenseQueryResult,
+} from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import {
 	deactivateEligibleRole,
@@ -62,7 +69,7 @@ export function useRoleTableQueries() {
 	// 	}
 	// })
 
-	const armEligibleRolesQueries = useQueries<CommonRoleSchedule[]>({
+	const armEligibleRolesQueries = useSuspenseQueries<CommonRoleSchedule[]>({
 		queries: accounts.map(account => ({
 			queryKey: ['pim', 'armEligibleRoles', account.localAccountId],
 			refetchInterval,
@@ -77,7 +84,7 @@ export function useRoleTableQueries() {
 		})),
 	})
 
-	const graphEligibleRolesQueries = useQueries<CommonRoleSchedule[]>({
+	const graphEligibleRolesQueries = useSuspenseQueries<CommonRoleSchedule[]>({
 		queries: accounts.map(account => ({
 			queryKey: ['pim', 'graphEligibleRoles', account.localAccountId],
 			refetchInterval,
@@ -92,7 +99,7 @@ export function useRoleTableQueries() {
 		})),
 	})
 
-	const groupEligibleRolesQueries = useQueries<CommonRoleSchedule[]>({
+	const groupEligibleRolesQueries = useSuspenseQueries<CommonRoleSchedule[]>({
 		queries: accounts.map(account => ({
 			queryKey: ['pim', 'groupEligibleRoles', account.localAccountId],
 			refetchInterval,
@@ -108,23 +115,19 @@ export function useRoleTableQueries() {
 	})
 
 	// Simplified: Combine data directly in queryFn, remove verbose enabled check
-	const eligibleRolesQuery = useQuery<CommonRoleSchedule[]>({
-		enabled:
-			armEligibleRolesQueries.every(q => q.isSuccess) &&
-			graphEligibleRolesQueries.every(q => q.isSuccess) &&
-			groupEligibleRolesQueries.every(q => q.isSuccess),
+	const eligibleRolesQuery = useSuspenseQuery<CommonRoleSchedule[]>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['pim', 'eligibleRoles'],
 		queryFn: () => [
 			//BUG: The cast is needed due to an inaccurate type error from useQueries
-			...(armEligibleRolesQueries as UseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
-			...(graphEligibleRolesQueries as UseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
-			...(groupEligibleRolesQueries as UseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
+			...(armEligibleRolesQueries as UseSuspenseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
+			...(graphEligibleRolesQueries as UseSuspenseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
+			...(groupEligibleRolesQueries as UseSuspenseQueryResult<CommonRoleSchedule[]>[]).flatMap(q => q.data ?? []),
 		],
 	})
 
 	// Assuming roleAssignmentsQuery is meant to be defined similarly; added placeholder for completeness
-	const armRoleScheduleInstances = useQueries<RoleAssignmentScheduleInstance[]>({
+	const armRoleScheduleInstances = useSuspenseQueries<RoleAssignmentScheduleInstance[]>({
 		// TODO: Only run if related Eligible Roles Exist
 		queries: accounts
 			.map(account => account.localAccountId)
@@ -138,7 +141,7 @@ export function useRoleTableQueries() {
 			})),
 	})
 
-	const graphRoleScheduleInstances = useQueries<UnifiedRoleAssignmentScheduleInstanceExpanded[]>({
+	const graphRoleScheduleInstances = useSuspenseQueries<UnifiedRoleAssignmentScheduleInstanceExpanded[]>({
 		// TODO: Only run if related Eligible Roles Exist
 		queries: accounts
 			.map(account => account.localAccountId)
@@ -152,7 +155,7 @@ export function useRoleTableQueries() {
 			})),
 	})
 
-	const groupRoleScheduleInstances = useQueries<PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]>({
+	const groupRoleScheduleInstances = useSuspenseQueries<PrivilegedAccessGroupAssignmentScheduleInstanceExpanded[]>({
 		// TODO: Only run if related Eligible Roles Exist
 		queries: accounts
 			.map(account => account.localAccountId)
@@ -166,11 +169,7 @@ export function useRoleTableQueries() {
 			})),
 	})
 
-	const roleAssignmentsQuery = useQuery<CommonRoleAssignmentScheduleInstance[]>({
-		enabled:
-			armRoleScheduleInstances.every(q => q.isSuccess) &&
-			graphRoleScheduleInstances.every(q => q.isSuccess) &&
-			groupRoleScheduleInstances.every(q => q.isSuccess),
+	const roleAssignmentsQuery = useSuspenseQuery<CommonRoleAssignmentScheduleInstance[]>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['pim', 'armRoleAssignmentScheduleInstances'],
 		queryFn: () => [
@@ -186,7 +185,7 @@ export function useRoleTableQueries() {
 		],
 	})
 
-	const armRoleSchedules = useQueries({
+	const armRoleSchedules = useSuspenseQueries({
 		queries: accounts
 			.map(account => account.localAccountId)
 			.map(accountId => ({
@@ -199,7 +198,7 @@ export function useRoleTableQueries() {
 			})),
 	})
 
-	const graphRoleSchedules = useQueries({
+	const graphRoleSchedules = useSuspenseQueries({
 		queries: accounts
 			.map(account => account.localAccountId)
 			.map(accountId => ({
@@ -212,7 +211,7 @@ export function useRoleTableQueries() {
 			})),
 	})
 
-	const groupRoleSchedules = useQueries({
+	const groupRoleSchedules = useSuspenseQueries({
 		queries: accounts
 			.map(account => account.localAccountId)
 			.map(accountId => ({
@@ -225,11 +224,7 @@ export function useRoleTableQueries() {
 			})),
 	})
 
-	const roleSchedulesQuery = useQuery<CommonRoleAssignmentSchedule[]>({
-		enabled:
-			armRoleSchedules.every(q => q.isSuccess) &&
-			graphRoleSchedules.every(q => q.isSuccess) &&
-			groupRoleSchedules.every(q => q.isSuccess),
+	const roleSchedulesQuery = useSuspenseQuery<CommonRoleAssignmentSchedule[]>({
 		queryKey: ['pim', 'roleSchedules'],
 		queryFn: () => [
 			...armRoleSchedules.flatMap(q => q.data ?? []).map(i => fromArmAssignmentSchedule(i)),
@@ -240,14 +235,13 @@ export function useRoleTableQueries() {
 
 	type RoleToStatusLookup = Record<string, CommonRoleAssignmentScheduleInstance | undefined>
 
-	const roleStatusQuery = useQuery<RoleToStatusLookup>({
+	const roleAssignments = roleAssignmentsQuery.data
+	const roleStatusQuery = useSuspenseQuery<RoleToStatusLookup>({
 		// Key is too big, use last update instead ATM
-		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['pim', 'eligibleRoleStatus', roleAssignmentsQuery.dataUpdatedAt],
-		enabled: roleAssignmentsQuery.isSuccess,
 		queryFn: () =>
 			toRecord(
-				(roleAssignmentsQuery.data ?? []).filter(x => x.linkedRoleEligibilityScheduleInstanceId),
+				roleAssignments.filter(x => x.linkedRoleEligibilityScheduleInstanceId),
 				'linkedRoleEligibilityScheduleInstanceId'
 			),
 	})

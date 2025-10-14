@@ -27,12 +27,17 @@ type Tenant = Pick<TenantIdDescription, 'tenantId' | 'displayName' | 'defaultDom
 /**
  * Renders the resolved tenant display name for the provided schedule.
  */
-export default function ResolvedTenantName({ role }: { role: CommonRoleSchedule }) {
+export function ResolvedTenantName({ role }: { role: CommonRoleSchedule }) {
 	const account = getCommonRoleScheduleAccount(role)
+	if (!account) {
+		throw new Error(
+			'Account not resolved yet. This is a bug that probably means the suspense query did not complete appropriately.'
+		)
+	}
 
 	const { data: tenantInfoLookup, isSuccess: tenantsFetched } = useSuspenseQuery<Record<string, Tenant>>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
-		queryKey: ['pim', 'tenants', account?.localAccountId ?? 'unknown'],
+		queryKey: ['tenants', account?.localAccountId ?? 'unknown'],
 		queryFn: async () => {
 			const resolvedAccount = account ?? throwError('Account required to fetch tenant cache')
 			const tenants = await fetchTenants(resolvedAccount)
@@ -142,7 +147,7 @@ async function fetchTenantIdForSchedule(role: CommonRoleSchedule, account: Accou
 		.with(P.instanceOf(ResourceId), ({ subscription }) => subscription)
 		.with(P.instanceOf(ResourceGroupId), ({ subscription }) => subscription)
 		.with(P.instanceOf(SubscriptionId), ({ id }) => id)
-		.otherwise(() => undefined)
+		.exhaustive()
 
 	if (!subscriptionId) throw new Error('Failed to parse subscription ID from schedule scope')
 
