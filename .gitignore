@@ -25,6 +25,12 @@ dev-dist
 .wrangler
 .dev.vars*
 
+#Chrome for testing
+.browsers
+
+#Kiota Fetched files
+.kiota
+
 #Generated Worker Configration
 worker-configuration.d.ts
 src/api/generated

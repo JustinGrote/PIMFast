@@ -21,19 +21,18 @@ export default defineConfig({
 		react(),
 		cloudflare(),
 		VitePWA({
-			registerType: 'autoUpdate',
+			registerType: 'prompt',
 			injectRegister: false,
-
 			pwaAssets: {
-				disabled: false,
-				config: true,
+				image: 'public/pimfast.svg',
+				injectThemeColor: true,
 			},
 
 			manifest: {
 				name: 'PIM Fast',
 				short_name: 'justingrote.pimfast',
 				description: 'PIM Fast is a faster UI alternative for Azure Privileged Identity Management.',
-				theme_color: '#ffffff',
+				theme_color: '#242424',
 			},
 
 			workbox: {
