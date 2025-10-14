@@ -11,11 +11,11 @@ import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { useCallback, useMemo, useState } from 'react'
+import { Suspense, useCallback, useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
-import ResolvedTenantName from './ResolvedTenantName'
+import { ResolvedTenantName } from './ResolvedTenantName'
 import { useRoleTableQueries } from './RoleTable.query'
 
 dayjs.extend(durationPlugin)
@@ -141,7 +141,13 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Tenant',
-				cellRenderer: (params: { data: CommonRoleSchedule }) => <ResolvedTenantName role={params.data} />,
+				cellRenderer: (params: { data: CommonRoleSchedule }) => {
+					return (
+						<Suspense fallback={<Skeleton>Fetching Tenant Info</Skeleton>}>
+							<ResolvedTenantName role={params.data} />
+						</Suspense>
+					)
+				},
 				flex: 1,
 				sortable: false,
 				resizable: true,
@@ -315,7 +321,8 @@ function RoleTable() {
 							Eligible Roles
 						</Title>
 						<Group gap="xs">
-							<Button
+							{/* FIXME: This breaks Tenant Refresh because the invalidate removes the account that tenantName depends on. */}
+							{/* <Button
 								disabled={eligibleRolesQuery.isLoading}
 								variant="subtle"
 								color="green"
@@ -323,7 +330,7 @@ function RoleTable() {
 								onClick={refresh}
 							>
 								<IconRefresh />
-							</Button>
+							</Button> */}
 							<Button
 								variant="subtle"
 								color="gray"

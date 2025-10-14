@@ -1,7 +1,7 @@
 import { AccountInfo } from '@azure/msal-browser'
 import { CommonRoleSchedule } from './CommonRoleSchedule'
 
-const commonRoleScheduleAccountMap = new WeakMap<CommonRoleSchedule, AccountInfo>()
+const commonRoleScheduleAccountMap = new Map<CommonRoleSchedule, AccountInfo>()
 
 /**
  * Stores the account associated with a common role schedule.
