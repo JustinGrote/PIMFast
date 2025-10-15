@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react-swc'
 import path from 'node:path'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -19,6 +20,8 @@ export default defineConfig({
 	},
 	plugins: [
 		react(),
+		// Fixes an error with vite and punycode, since we only use node for the build process
+		nodePolyfills(),
 		cloudflare(),
 		VitePWA({
 			registerType: 'prompt',

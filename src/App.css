@@ -5,6 +5,10 @@
   text-align: center;
 }
 
+.accountTable .ag-center-cols-viewport {
+  min-height: unset !important;
+  /* Removes the default min-height */
+}
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -40,3 +44,18 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Remove trailing space after rows for AG Grid instances using domLayout="autoHeight" */
+/* .ag-grid-autoheight .ag-center-cols-container {
+	padding-bottom: 0 !important;
+}
+.ag-grid-autoheight .ag-body-viewport {
+	overflow: visible;
+}
+.ag-grid-autoheight .ag-root-wrapper {
+	margin-bottom: 0 !important;
+}
+.ag-theme-alpine .ag-body,
+.ag-theme-alpine .ag-center-cols-clipper {
+	padding-bottom: 0 !important;
+} */

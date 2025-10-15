@@ -16,6 +16,7 @@ import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { memo } from 'react'
 import { match, P } from 'ts-pattern'
 
 /**
@@ -27,6 +28,7 @@ type Tenant = Pick<TenantIdDescription, 'tenantId' | 'displayName' | 'defaultDom
 /**
  * Renders the resolved tenant display name for the provided schedule.
  */
+
 export function ResolvedTenantName({ role }: { role: CommonRoleSchedule }) {
 	const account = getCommonRoleScheduleAccount(role)
 	if (!account) {
@@ -163,3 +165,5 @@ async function fetchTenantIdForSchedule(role: CommonRoleSchedule, account: Accou
 
 	return subscription.tenantId
 }
+
+export default memo(ResolvedTenantName)

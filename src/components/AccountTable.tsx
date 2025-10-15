@@ -64,14 +64,12 @@ export default function AccountTable() {
 	)
 
 	return (
-		<div style={{ height: '400px', width: '100%', position: 'relative' }}>
-			<MantineAgGridReact
-				rowData={accounts}
-				columnDefs={columnDefs}
-				getRowId={params => params.data.localAccountId}
-				domLayout="autoHeight"
-				suppressHorizontalScroll={false}
-			/>
-		</div>
+		<MantineAgGridReact
+			className="accountTable"
+			rowData={accounts}
+			columnDefs={columnDefs}
+			getRowId={params => params.data.localAccountId}
+			suppressHorizontalScroll={false}
+		/>
 	)
 }

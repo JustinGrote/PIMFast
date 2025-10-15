@@ -5,13 +5,16 @@ import { AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-reac
 import { scopesGraphAndAzure, setMsalInstance } from '@/api/auth.ts'
 import AccountTable from '@/components/AccountTable.tsx'
 import ErrorBoundary from '@/components/ErrorBoundary.tsx'
-import { Text, Button, Stack, Loader } from '@mantine/core'
+import { Text, Button, Stack, Loader, Skeleton } from '@mantine/core'
 import { InteractionStatus } from '@azure/msal-browser'
 import { IconBrandAzure } from '@tabler/icons-react'
 import RoleTable from './components/RoleTable.tsx'
+import { useQueryClient } from '@tanstack/react-query'
+import { Suspense } from 'react'
 
 function App() {
 	const { instance, inProgress } = useMsal()
+	const queryClient = useQueryClient()
 	setMsalInstance(instance)
 	return (
 		<>
@@ -29,11 +32,6 @@ function App() {
 						</Text>
 					</Stack>
 				</UnauthenticatedTemplate>
-				<AuthenticatedTemplate>
-					<AccountTable />
-					<RoleTable />
-				</AuthenticatedTemplate>
-
 				<Button
 					leftSection={
 						inProgress === InteractionStatus.Login ? (
@@ -46,17 +44,33 @@ function App() {
 						)
 					}
 					disabled={inProgress === InteractionStatus.Login}
-					onClick={() =>
-						instance.loginPopup({
-							scopes: scopesGraphAndAzure,
-							prompt: 'select_account',
-						})
-					}
+					onClick={() => {
+						instance
+							.loginPopup({
+								scopes: scopesGraphAndAzure,
+								prompt: 'select_account',
+							})
+							.then(() => {
+								// Invalidate all queries to ensure fresh data after login
+								queryClient.invalidateQueries()
+							})
+					}}
 					variant="filled"
 					color="blue"
 				>
 					{inProgress === InteractionStatus.Login ? 'Authenticating (continue in popup)' : 'Authenticate with Azure'}
 				</Button>
+				<p></p>
+				<AuthenticatedTemplate>
+					<Stack>
+						<Suspense fallback={<Skeleton />}>
+							<AccountTable />
+						</Suspense>
+						<Suspense fallback={<Skeleton />}>
+							<RoleTable />
+						</Suspense>
+					</Stack>
+				</AuthenticatedTemplate>
 
 				<PWABadge />
 			</ErrorBoundary>

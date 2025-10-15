@@ -31,7 +31,7 @@ function RoleTable() {
 
 	const {
 		accountIds,
-		eligibleRolesQuery,
+		eligibleRoles,
 		roleStatusQuery,
 		deactivateEligibleRoleMutation,
 		refresh,
@@ -252,7 +252,7 @@ function RoleTable() {
 
 	// Filter the eligible roles based on search query
 	const filteredRoles = useMemo(() => {
-		let filtered: CommonRoleSchedule[] = eligibleRolesQuery.data ?? []
+		let filtered: CommonRoleSchedule[] = eligibleRoles
 
 		// Apply search filter
 		if (filterQuery) {
@@ -272,7 +272,7 @@ function RoleTable() {
 		}
 
 		return filtered
-	}, [filterQuery, eligibleRolesQuery.data])
+	}, [filterQuery, eligibleRoles])
 
 	const onGridReady = (params: GridReadyEvent<CommonRoleSchedule>) => {
 		setGridApi(params.api)
@@ -303,26 +303,21 @@ function RoleTable() {
 
 	return (
 		<>
-			<Paper
-				shadow="xs"
-				p="lg"
-				radius="md"
-			>
-				<Stack gap="md">
-					<Group
-						justify="space-between"
-						align="center"
+			<Stack gap="md">
+				<Group
+					justify="space-between"
+					align="center"
+				>
+					<Title
+						order={3}
+						c="white"
+						fw={600}
 					>
-						<Title
-							order={3}
-							c="white"
-							fw={600}
-						>
-							Eligible Roles
-						</Title>
-						<Group gap="xs">
-							{/* FIXME: This breaks Tenant Refresh because the invalidate removes the account that tenantName depends on. */}
-							{/* <Button
+						Eligible Roles
+					</Title>
+					<Group gap="xs">
+						{/* FIXME: This breaks Tenant Refresh because the invalidate removes the account that tenantName depends on. */}
+						{/* <Button
 								disabled={eligibleRolesQuery.isLoading}
 								variant="subtle"
 								color="green"
@@ -331,46 +326,40 @@ function RoleTable() {
 							>
 								<IconRefresh />
 							</Button> */}
-							<Button
-								variant="subtle"
-								color="gray"
-								size="compact-sm"
-								onClick={resetColumnsOrder}
-							>
-								<IconClearAll />
-							</Button>
-						</Group>
+						<Button
+							variant="subtle"
+							color="gray"
+							size="compact-sm"
+							onClick={resetColumnsOrder}
+						>
+							<IconClearAll />
+						</Button>
 					</Group>
+				</Group>
 
-					<TextInput
-						placeholder="Search roles, accounts, scopes, or tenants..."
-						leftSection={<IconSearch size={16} />}
-						value={filterQuery}
-						onChange={event => setFilterQuery(event.currentTarget.value)}
-						mb="md"
-					/>
+				<TextInput
+					placeholder="Search roles, accounts, scopes, or tenants..."
+					leftSection={<IconSearch size={16} />}
+					value={filterQuery}
+					onChange={event => setFilterQuery(event.currentTarget.value)}
+					mb="md"
+				/>
 
-					<div style={{ height: 'calc(100vh - 200px)', width: '100%', position: 'relative', minHeight: '400px' }}>
-						<MantineAgGridReact<CommonRoleSchedule>
-							className="roleTable"
-							loading={eligibleRolesQuery.isLoading}
-							rowData={filteredRoles}
-							columnDefs={columnDefs}
-							getRowId={params => params.data.id}
-							onGridReady={onGridReady}
-							// getRowStyle={getRowStyle}
-							domLayout="normal"
-							rowSelection={{ mode: 'singleRow', checkboxes: false }}
-							animateRows={false}
-							defaultColDef={{
-								sortable: true,
-								filter: true,
-								resizable: true,
-							}}
-						/>
-					</div>
-				</Stack>
-			</Paper>
+				<MantineAgGridReact<CommonRoleSchedule>
+					className="roleTable"
+					rowData={filteredRoles}
+					columnDefs={columnDefs}
+					getRowId={params => params.data.id}
+					onGridReady={onGridReady}
+					rowSelection={{ mode: 'singleRow', checkboxes: false }}
+					animateRows={false}
+					defaultColDef={{
+						sortable: true,
+						filter: true,
+						resizable: true,
+					}}
+				/>
+			</Stack>
 
 			<Modal
 				opened={isActivationModalOpened}
