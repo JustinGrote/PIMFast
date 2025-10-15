@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "deploy-worker": "pnpm build && wrangler deploy",
     "types": "pnpm wrangler types",
-    "postinstall": "pnpm installChrome",
+    "postinstall": "pnpm types && pnpm installChrome",
     "installChrome": "pwsh -c \"$chrome=(pnpm dlx @puppeteer/browsers install chrome --path .browsers).split(' ')[1];New-Item -ItemType SymbolicLink -Path '.browsers/chrome-testing' -Target (Join-Path $PWD (Split-Path $chrome)) -Force\"",
     "buildPimClient": "pnpm dlx @kiota-community/kiota-gen generate --openapi https://aka.ms/graph/v1.0/openapi.yaml --include-path /roleManagement/directory/** --include-path /identityGovernance/privilegedAccess/group/** -l TypeScript -o src/api/generated/msgraph -c PimGraphClient"
   },
