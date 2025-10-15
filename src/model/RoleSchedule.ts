@@ -1,16 +1,11 @@
-import {
-	DirectoryObject,
-	Group,
-	PrivilegedAccessGroupEligibilitySchedule,
-} from '@/api/generated/msgraph/models';
-import { UnifiedRoleEligibilityScheduleExpanded } from '@/api/pimGraph';
-import { RoleEligibilitySchedule } from '@azure/arm-authorization';
+import { DirectoryObject, Group, PrivilegedAccessGroupEligibilitySchedule } from '@/api/generated/msgraph/models'
+import { UnifiedRoleEligibilityScheduleExpanded } from '@/api/pimGraph'
+import { RoleEligibilitySchedule } from '@azure/arm-authorization'
 
 /**
  * Expanded interface for PrivilegedAccessGroupEligibilitySchedule with populated group and principal
  */
-export interface PrivilegedAccessGroupEligibilityScheduleExpanded
-	extends PrivilegedAccessGroupEligibilitySchedule {
+export interface PrivilegedAccessGroupEligibilityScheduleExpanded extends PrivilegedAccessGroupEligibilitySchedule {
 	group: Group & {
 		displayName?: string
 		description?: string
@@ -30,7 +25,7 @@ export interface PrivilegedAccessGroupEligibilityScheduleExpanded
  * - Entra ID directory roles (Graph API) - Display only for now
  * - Group roles (Graph API PIM for Groups) - Display only for now
  */
-export interface CommonRoleSchedule {
+export interface RoleScheduleBase {
 	/** Unique identifier for the role schedule instance */
 	id: string
 	/** Scope/resource where the role applies (ARM: scope, Graph: directoryScopeId) */
@@ -51,19 +46,27 @@ export interface CommonRoleSchedule {
 	startDateTime?: Date
 	/** End date of the eligibility */
 	endDateTime?: Date
-	/** Original schedule instance for activation purposes */
-	originalSchedule:
-		| RoleEligibilitySchedule
-		| UnifiedRoleEligibilityScheduleExpanded
-		| PrivilegedAccessGroupEligibilityScheduleExpanded
-	/** Source API type for debugging and specific operations */
-	sourceType: 'arm' | 'graph' | 'group'
 }
+
+export interface ArmRoleSchedule extends RoleScheduleBase {
+	sourceType: 'arm'
+	originalSchedule: RoleEligibilitySchedule
+}
+export interface GraphRoleSchedule extends RoleScheduleBase {
+	sourceType: 'graph'
+	originalSchedule: UnifiedRoleEligibilityScheduleExpanded
+}
+export interface GroupRoleSchedule extends RoleScheduleBase {
+	sourceType: 'group'
+	originalSchedule: PrivilegedAccessGroupEligibilityScheduleExpanded
+}
+
+export type RoleSchedule = ArmRoleSchedule | GraphRoleSchedule | GroupRoleSchedule
 
 /**
  * Converts an Azure ARM RoleEligibilitySchedule to the common interface.
  */
-export function fromArmSchedule(schedule: RoleEligibilitySchedule): CommonRoleSchedule {
+export function fromArmSchedule(schedule: RoleEligibilitySchedule): RoleSchedule {
 	return {
 		id: schedule.id ?? '',
 		scope: schedule.scope ?? '',
@@ -83,13 +86,13 @@ export function fromArmSchedule(schedule: RoleEligibilitySchedule): CommonRoleSc
 /**
  * Converts a Microsoft Graph UnifiedRoleEligibilityScheduleExpanded to the common interface.
  */
-export function fromGraphSchedule(schedule: UnifiedRoleEligibilityScheduleExpanded): CommonRoleSchedule {
+export function fromGraphSchedule(schedule: UnifiedRoleEligibilityScheduleExpanded): RoleSchedule {
 	return {
 		id: schedule.id ?? '',
 		scope: schedule.directoryScopeId ?? '/',
 		roleDefinitionId: schedule.roleDefinitionId ?? '',
 		roleDefinitionDisplayName: schedule.roleDefinition?.displayName ?? 'Unknown Role',
-		scopeDisplayName: schedule.directoryScopeId === '/' ? 'Directory' : (schedule.directoryScopeId ?? 'Unknown Scope'),
+		scopeDisplayName: schedule.directoryScopeId === '/' ? 'Directory' : schedule.directoryScopeId ?? 'Unknown Scope',
 		scopeType: schedule.directoryScopeId === '/' ? 'directory' : undefined,
 		principalId: schedule.principalId ?? '',
 		principalDisplayName: schedule.principal?.displayName,
@@ -105,9 +108,7 @@ export function fromGraphSchedule(schedule: UnifiedRoleEligibilityScheduleExpand
 /**
  * Converts a Microsoft Graph PrivilegedAccessGroupEligibilityScheduleExpanded to the common interface.
  */
-export function fromGroupSchedule(
-	schedule: PrivilegedAccessGroupEligibilityScheduleExpanded,
-): CommonRoleSchedule {
+export function fromGroupSchedule(schedule: PrivilegedAccessGroupEligibilityScheduleExpanded): RoleSchedule {
 	// Access ID determines the role type (owner or member)
 	const roleDisplayName = schedule.accessId === 'owner' ? 'Owner' : 'Member'
 	const groupDisplayName = schedule.group?.displayName ?? 'Unknown Group'

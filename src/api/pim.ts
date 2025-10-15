@@ -7,7 +7,7 @@ import {
 	toEntraRoleAssignmentScheduleRequest,
 	toGroupRoleAssignmentScheduleRequest,
 } from '@/model/CommonRoleActivateRequest'
-import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { RoleSchedule } from '@/model/RoleSchedule'
 import { AccountInfoOrId, getCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import {
 	AuthorizationManagementClient,
@@ -160,7 +160,7 @@ export async function activateEligibleRole(account: AccountInfoOrId, request: Co
 		})
 }
 
-export async function deactivateEligibleRole(schedule: CommonRoleSchedule) {
+export async function deactivateEligibleRole(schedule: RoleSchedule) {
 	const account = getCommonRoleScheduleAccount(schedule) ?? throwError('Account missing for schedule deactivation')
 	const client = getPimClient(account)
 
@@ -188,7 +188,7 @@ export async function deactivateEligibleRole(schedule: CommonRoleSchedule) {
 }
 
 /** Check a role status by fetching its request and seeing if it links back to the schedule */
-export async function getEligibleRoleAssignment(schedule: CommonRoleSchedule) {
+export async function getEligibleRoleAssignment(schedule: RoleSchedule) {
 	const account = getCommonRoleScheduleAccount(schedule) ?? throwError('Account missing for assignment lookup')
 	const client = getPimClient(account)
 

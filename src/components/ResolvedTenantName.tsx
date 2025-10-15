@@ -10,7 +10,7 @@ import {
 import { fetchManagementGroup } from '@/api/managementGroups'
 import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
 import { throwError, throwIfNotError, toRecord } from '@/api/util'
-import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { RoleSchedule } from '@/model/RoleSchedule'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
@@ -28,7 +28,7 @@ type Tenant = Pick<TenantIdDescription, 'tenantId' | 'displayName' | 'defaultDom
  * Renders the resolved tenant display name for the provided schedule.
  */
 
-function ResolvedTenantName({ role, account }: { role: CommonRoleSchedule; account: AccountInfo }) {
+function ResolvedTenantName({ role, account }: { role: RoleSchedule; account: AccountInfo }) {
 	const { data: tenantInfoLookup, isSuccess: tenantsFetched } = useSuspenseQuery<Record<string, Tenant>>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
 		queryKey: ['tenants', account.localAccountId],
@@ -109,7 +109,7 @@ export class FetchTenantSubscriptionNotFoundError extends Error {
 	}
 }
 
-async function fetchTenantIdForSchedule(role: CommonRoleSchedule, account: AccountInfo): Promise<string> {
+async function fetchTenantIdForSchedule(role: RoleSchedule, account: AccountInfo): Promise<string> {
 	// For non-ARM scopes, assume no B2B is involved and return the account tenant
 	// FIXME: B2B Maybe?
 	if (role.sourceType !== 'arm') return account.tenantId

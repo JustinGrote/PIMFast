@@ -1,7 +1,7 @@
 import { activateEligibleRole } from '@/api/pim'
 import { throwError } from '@/api/util'
 import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest'
-import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { RoleSchedule } from '@/model/RoleSchedule'
 import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { DateTimePicker } from '@mantine/dates'
@@ -18,7 +18,7 @@ dayjs.extend(durationPlugin)
 
 interface RoleActivationFormProps {
 	/** The schedule to create an activation request for */
-	schedule: CommonRoleSchedule
+	schedule: RoleSchedule
 	/** Called when the form is successfully submitted */
 	onSuccess?: (request: CommonRoleActivateRequest) => void
 	/** Called when the form submission fails */

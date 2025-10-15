@@ -1,7 +1,7 @@
 import { getAzurePortalUrl } from '@/api/azureResourceId'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
+import { RoleSchedule } from '@/model/RoleSchedule'
 import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
@@ -26,8 +26,8 @@ dayjs.extend(relativeTimePlugin)
 
 function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
-	const [selectedRole, setSelectedRole] = useState<CommonRoleSchedule | null>(null)
-	const [gridApi, setGridApi] = useState<GridApi<CommonRoleSchedule> | null>(null)
+	const [selectedRole, setSelectedRole] = useState<RoleSchedule | null>(null)
+	const [gridApi, setGridApi] = useState<GridApi<RoleSchedule> | null>(null)
 	const [filterQuery, setFilterQuery] = useState('')
 
 	const {
@@ -41,7 +41,7 @@ function RoleTable() {
 	} = useRoleTableQueries()
 
 	const handleActivateClick = useCallback(
-		(eligibleRole: CommonRoleSchedule) => {
+		(eligibleRole: RoleSchedule) => {
 			setSelectedRole(eligibleRole)
 			if (!isEligibleRoleActivated(eligibleRole)) {
 				openActivationModal()
@@ -57,13 +57,13 @@ function RoleTable() {
 	 * on every render which can cause unnecessary AG Grid updates.
 	 */
 	const renderStatusCell = useCallback(
-		(params: { data: CommonRoleSchedule }) => {
+		(params: { data: RoleSchedule }) => {
 			const isActivated = isEligibleRoleActivated(params.data)
 			const roleStatus = roleStatusQuery.data?.[params.data.id]
 
 			if (isActivated && roleStatus?.endDateTime) {
 				return (
-					<Center>
+					<Center style={{ width: '100%' }}>
 						<ExpiresCountdown
 							futureDate={roleStatus.endDateTime}
 							active={true}
@@ -91,12 +91,12 @@ function RoleTable() {
 		[isEligibleRoleActivated, roleStatusQuery.data]
 	)
 
-	const columnDefs: ColDef<CommonRoleSchedule>[] = useMemo(
+	const columnDefs: ColDef<RoleSchedule>[] = useMemo(
 		() => [
 			{
 				field: 'roleDefinitionDisplayName',
 				headerName: 'Role',
-				cellRenderer: (params: { data: CommonRoleSchedule }) => (
+				cellRenderer: (params: { data: RoleSchedule }) => (
 					<div>
 						<span title={params.data.roleDefinitionId || ''}>{params.data.roleDefinitionDisplayName ?? 'unknown'}</span>
 					</div>
@@ -107,7 +107,7 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Scope',
-				cellRenderer: (params: { data: CommonRoleSchedule }) => {
+				cellRenderer: (params: { data: RoleSchedule }) => {
 					const icon = match(params.data.scopeType)
 						.with('resourcegroup', () => <ResourceGroups />)
 						.with('subscription', () => <Subscriptions />)
@@ -152,7 +152,7 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Account',
-				cellRenderer: (params: { data: CommonRoleSchedule }) => {
+				cellRenderer: (params: { data: RoleSchedule }) => {
 					const account = getCommonRoleScheduleAccount(params.data)
 					if (!account) {
 						return <Text size="sm">Unknown account</Text>
@@ -181,7 +181,7 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Tenant',
-				cellRenderer: (params: { data: CommonRoleSchedule }) => {
+				cellRenderer: (params: { data: RoleSchedule }) => {
 					return (
 						<Suspense fallback={<Skeleton>Fetching Tenant Info</Skeleton>}>
 							<ResolvedTenantName
@@ -215,7 +215,7 @@ function RoleTable() {
 						<IconClick size={16} />
 					</Center>
 				),
-				cellRenderer: (params: { data: CommonRoleSchedule }) => (
+				cellRenderer: (params: { data: RoleSchedule }) => (
 					<div className="one-line-row">
 						<Group>
 							<ActionIcon
@@ -268,7 +268,7 @@ function RoleTable() {
 
 	// Filter the eligible roles based on search query
 	const filteredRoles = useMemo(() => {
-		let filtered: CommonRoleSchedule[] = eligibleRolesQuery.data
+		let filtered: RoleSchedule[] = eligibleRolesQuery.data
 
 		// Apply search filter
 		if (filterQuery) {
@@ -290,7 +290,7 @@ function RoleTable() {
 		return filtered
 	}, [filterQuery, eligibleRolesQuery.data])
 
-	const onGridReady = (params: GridReadyEvent<CommonRoleSchedule>) => {
+	const onGridReady = (params: GridReadyEvent<RoleSchedule>) => {
 		setGridApi(params.api)
 	}
 
@@ -311,9 +311,10 @@ function RoleTable() {
 	// 	return undefined
 	// }
 
-	const resetColumnsOrder = () => {
+	const resetView = () => {
 		if (gridApi) {
 			gridApi.resetColumnState()
+			gridApi.resetQuickFilter()
 		}
 	}
 
@@ -346,7 +347,7 @@ function RoleTable() {
 							variant="subtle"
 							color="gray"
 							size="compact-sm"
-							onClick={resetColumnsOrder}
+							onClick={resetView}
 						>
 							<IconClearAll />
 						</Button>
@@ -361,7 +362,7 @@ function RoleTable() {
 					mb="md"
 				/>
 
-				<MantineAgGridReact<CommonRoleSchedule>
+				<MantineAgGridReact<RoleSchedule>
 					className="roleTable"
 					loading={eligibleRolesQuery.isLoading}
 					rowData={filteredRoles}

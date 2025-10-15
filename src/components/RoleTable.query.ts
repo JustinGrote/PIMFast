@@ -12,7 +12,7 @@ import {
 	fromGraphAssignment,
 	fromGroupAssignment,
 } from '@/model/CommonRoleAssignmentScheduleInstance'
-import { CommonRoleSchedule, fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/CommonRoleSchedule'
+import { RoleSchedule, fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/RoleSchedule'
 import { setCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { KnownStatus } from '@azure/arm-authorization'
 import { useMsal } from '@azure/msal-react'
@@ -67,12 +67,12 @@ export function useRoleTableQueries() {
 	// 	}
 	// })
 
-	const armEligibleRoles: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
+	const armEligibleRoles: UseSuspenseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
 		queryKey: ['pim', 'armEligibleRoles', account.localAccountId],
 		refetchInterval,
 		queryFn: async () => {
 			const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(account.localAccountId))
-			return schedules.map<CommonRoleSchedule>(schedule => {
+			return schedules.map<RoleSchedule>(schedule => {
 				const commonSchedule = fromArmSchedule(schedule)
 				setCommonRoleScheduleAccount(commonSchedule, account)
 				return commonSchedule
@@ -80,7 +80,7 @@ export function useRoleTableQueries() {
 		},
 	}))
 
-	const graphEligibleRoles: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
+	const graphEligibleRoles: UseSuspenseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
 		queryKey: ['pim', 'graphEligibleRoles', account.localAccountId],
 		refetchInterval,
 		queryFn: async () => {
@@ -93,12 +93,12 @@ export function useRoleTableQueries() {
 		},
 	}))
 
-	const groupEligibleRoles: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
+	const groupEligibleRoles: UseSuspenseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
 		queryKey: ['pim', 'groupEligibleRoles', account.localAccountId],
 		refetchInterval,
 		queryFn: async () => {
 			const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(account.localAccountId)
-			return groupScheduleResult.map<CommonRoleSchedule>(schedule => {
+			return groupScheduleResult.map<RoleSchedule>(schedule => {
 				const commonSchedule = fromGroupSchedule(schedule)
 				setCommonRoleScheduleAccount(commonSchedule, account)
 				return commonSchedule
@@ -232,7 +232,7 @@ export function useRoleTableQueries() {
 	 * Checks if an eligible role is activated.
 	 * @param role The eligible role to check.
 	 */
-	function isEligibleRoleActivated(schedule: CommonRoleSchedule): boolean {
+	function isEligibleRoleActivated(schedule: RoleSchedule): boolean {
 		if (!roleStatusQuery.data) return false
 		const assignment = roleStatusQuery.data[schedule.id]
 		if (!assignment) return false
@@ -251,7 +251,7 @@ export function useRoleTableQueries() {
 	 * Checks if an eligible role was newly activated (less than 5 minutes ago).
 	 * @param role The eligible role to check.
 	 */
-	function isEligibleRoleNewlyActivated(schedule: CommonRoleSchedule): boolean {
+	function isEligibleRoleNewlyActivated(schedule: RoleSchedule): boolean {
 		const AZURE_PIM_MIN_ACTIVATION_TIME = 5
 		if (!roleStatusQuery.data) return false
 		const assignment = roleStatusQuery.data[schedule.id]
