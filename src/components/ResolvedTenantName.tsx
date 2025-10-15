@@ -11,7 +11,6 @@ import { fetchManagementGroup } from '@/api/managementGroups'
 import { fetchSubscriptions, fetchTenants, findTenantInformation } from '@/api/subscriptions'
 import { throwError, throwIfNotError, toRecord } from '@/api/util'
 import { CommonRoleSchedule } from '@/model/CommonRoleSchedule'
-import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { TenantIdDescription } from '@azure/arm-resources-subscriptions'
 import { AccountInfo } from '@azure/msal-browser'
 import { Skeleton, Text } from '@mantine/core'
@@ -29,20 +28,12 @@ type Tenant = Pick<TenantIdDescription, 'tenantId' | 'displayName' | 'defaultDom
  * Renders the resolved tenant display name for the provided schedule.
  */
 
-export function ResolvedTenantName({ role }: { role: CommonRoleSchedule }) {
-	const account = getCommonRoleScheduleAccount(role)
-	if (!account) {
-		throw new Error(
-			'Account not resolved yet. This is a bug that probably means the suspense query did not complete appropriately.'
-		)
-	}
-
+function ResolvedTenantName({ role, account }: { role: CommonRoleSchedule; account: AccountInfo }) {
 	const { data: tenantInfoLookup, isSuccess: tenantsFetched } = useSuspenseQuery<Record<string, Tenant>>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
-		queryKey: ['tenants', account?.localAccountId ?? 'unknown'],
+		queryKey: ['tenants', account.localAccountId],
 		queryFn: async () => {
-			const resolvedAccount = account ?? throwError('Account required to fetch tenant cache')
-			const tenants = await fetchTenants(resolvedAccount)
+			const tenants = await fetchTenants(account)
 			return toRecord(tenants, 'tenantId')
 		},
 		// We will be appending fairly static tenant data to this cache, so it only needs to be fetched once unless it is explicity invalidated
@@ -55,7 +46,7 @@ export function ResolvedTenantName({ role }: { role: CommonRoleSchedule }) {
 		error,
 	} = useQuery<Tenant>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
-		queryKey: ['pim', 'tenant', account?.localAccountId ?? 'unknown', role.id],
+		queryKey: ['pim', 'tenant', account.localAccountId],
 		enabled: tenantsFetched && Boolean(account),
 		retry: false,
 		queryFn: async () => {
@@ -87,10 +78,6 @@ export function ResolvedTenantName({ role }: { role: CommonRoleSchedule }) {
 			}
 		},
 	})
-
-	if (!account) {
-		return <Text c="yellow">Unknown account</Text>
-	}
 
 	if (isLoading) {
 		return <Skeleton>Loading Tenant ID</Skeleton>
@@ -166,4 +153,4 @@ async function fetchTenantIdForSchedule(role: CommonRoleSchedule, account: Accou
 	return subscription.tenantId
 }
 
-export default memo(ResolvedTenantName)
+export default memo(ResolvedTenantName, () => true) //Never re-render

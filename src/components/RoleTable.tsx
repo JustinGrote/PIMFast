@@ -15,8 +15,9 @@ import { Suspense, useCallback, useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
-import { ResolvedTenantName } from './ResolvedTenantName'
+import ResolvedTenantName from './ResolvedTenantName'
 import { useRoleTableQueries } from './RoleTable.query'
+import { throwError } from '@/api/util'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -31,7 +32,7 @@ function RoleTable() {
 
 	const {
 		accountIds,
-		eligibleRoles,
+		eligibleRolesQuery,
 		roleStatusQuery,
 		deactivateEligibleRoleMutation,
 		refresh,
@@ -49,6 +50,45 @@ function RoleTable() {
 			}
 		},
 		[deactivateEligibleRoleMutation, isEligibleRoleActivated, openActivationModal]
+	)
+
+	/**
+	 * Memoized renderer for the Status column to avoid recreating the function
+	 * on every render which can cause unnecessary AG Grid updates.
+	 */
+	const renderStatusCell = useCallback(
+		(params: { data: CommonRoleSchedule }) => {
+			const isActivated = isEligibleRoleActivated(params.data)
+			const roleStatus = roleStatusQuery.data?.[params.data.id]
+
+			if (isActivated && roleStatus?.endDateTime) {
+				return (
+					<Center>
+						<ExpiresCountdown
+							futureDate={roleStatus.endDateTime}
+							active={true}
+						/>
+					</Center>
+				)
+			}
+
+			return params.data.endDateTime ? (
+				<Center>
+					<ExpiresCountdown futureDate={params.data.endDateTime} />
+				</Center>
+			) : (
+				<Center>
+					<Text
+						size="sm"
+						style={{ textAlign: 'center' }}
+						title="No expiration"
+					>
+						Permanent
+					</Text>
+				</Center>
+			)
+		},
+		[isEligibleRoleActivated, roleStatusQuery.data]
 	)
 
 	const columnDefs: ColDef<CommonRoleSchedule>[] = useMemo(
@@ -144,7 +184,13 @@ function RoleTable() {
 				cellRenderer: (params: { data: CommonRoleSchedule }) => {
 					return (
 						<Suspense fallback={<Skeleton>Fetching Tenant Info</Skeleton>}>
-							<ResolvedTenantName role={params.data} />
+							<ResolvedTenantName
+								role={params.data}
+								account={
+									getCommonRoleScheduleAccount(params.data) ??
+									throwError('Account not found in Role to Account Map. This is a bug')
+								}
+							/>
 						</Suspense>
 					)
 				},
@@ -154,37 +200,7 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Status',
-				cellRenderer: (params: { data: CommonRoleSchedule }) => {
-					const isActivated = isEligibleRoleActivated(params.data)
-					const roleStatus = roleStatusQuery.data?.[params.data.id]
-
-					if (isActivated && roleStatus?.endDateTime) {
-						return (
-							<Center>
-								<ExpiresCountdown
-									futureDate={roleStatus.endDateTime}
-									active={true}
-								/>
-							</Center>
-						)
-					}
-
-					return params.data.endDateTime ? (
-						<Center>
-							<ExpiresCountdown futureDate={params.data.endDateTime} />
-						</Center>
-					) : (
-						<Center>
-							<Text
-								size="sm"
-								style={{ textAlign: 'center' }}
-								title="No expiration"
-							>
-								Permanent
-							</Text>
-						</Center>
-					)
-				},
+				cellRenderer: renderStatusCell,
 				width: 100,
 				sortable: false,
 				resizable: true,
@@ -245,14 +261,14 @@ function RoleTable() {
 			handleActivateClick,
 			isEligibleRoleActivated,
 			isEligibleRoleNewlyActivated,
-			roleStatusQuery.data,
+			renderStatusCell,
 			roleStatusQuery.isSuccess,
 		]
 	)
 
 	// Filter the eligible roles based on search query
 	const filteredRoles = useMemo(() => {
-		let filtered: CommonRoleSchedule[] = eligibleRoles
+		let filtered: CommonRoleSchedule[] = eligibleRolesQuery.data
 
 		// Apply search filter
 		if (filterQuery) {
@@ -272,7 +288,7 @@ function RoleTable() {
 		}
 
 		return filtered
-	}, [filterQuery, eligibleRoles])
+	}, [filterQuery, eligibleRolesQuery.data])
 
 	const onGridReady = (params: GridReadyEvent<CommonRoleSchedule>) => {
 		setGridApi(params.api)
@@ -347,6 +363,7 @@ function RoleTable() {
 
 				<MantineAgGridReact<CommonRoleSchedule>
 					className="roleTable"
+					loading={eligibleRolesQuery.isLoading}
 					rowData={filteredRoles}
 					columnDefs={columnDefs}
 					getRowId={params => params.data.id}

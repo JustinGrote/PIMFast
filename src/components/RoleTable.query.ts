@@ -21,8 +21,7 @@ import {
 	useQueries,
 	useQuery,
 	useQueryClient,
-	useSuspenseQueries,
-	useSuspenseQuery,
+	UseQueryOptions,
 	UseSuspenseQueryOptions,
 } from '@tanstack/react-query'
 import dayjs from 'dayjs'
@@ -68,7 +67,7 @@ export function useRoleTableQueries() {
 	// 	}
 	// })
 
-	const armEligibleRolesQueries: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
+	const armEligibleRoles: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
 		queryKey: ['pim', 'armEligibleRoles', account.localAccountId],
 		refetchInterval,
 		queryFn: async () => {
@@ -81,7 +80,7 @@ export function useRoleTableQueries() {
 		},
 	}))
 
-	const graphEligibleRolesQueries: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
+	const graphEligibleRoles: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
 		queryKey: ['pim', 'graphEligibleRoles', account.localAccountId],
 		refetchInterval,
 		queryFn: async () => {
@@ -94,7 +93,7 @@ export function useRoleTableQueries() {
 		},
 	}))
 
-	const groupEligibleRolesQueries: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
+	const groupEligibleRoles: UseSuspenseQueryOptions<CommonRoleSchedule[]>[] = accounts.map(account => ({
 		queryKey: ['pim', 'groupEligibleRoles', account.localAccountId],
 		refetchInterval,
 		queryFn: async () => {
@@ -107,39 +106,7 @@ export function useRoleTableQueries() {
 		},
 	}))
 
-	// Assuming roleAssignmentsQuery is meant to be defined similarly; added placeholder for completeness
-	const armRoleScheduleInstances: UseSuspenseQueryOptions<CommonRoleAssignmentScheduleInstance[]>[] = accounts.map(
-		account => ({
-			queryKey: ['pim', 'armRoleScheduleInstances', account.localAccountId],
-			refetchInterval,
-			queryFn: async () => {
-				const instances = await Array.fromAsync(getMyRoleAssignmentScheduleInstances(account.localAccountId))
-				return instances.map(fromArmAssignment)
-			},
-		})
-	)
-	const graphRoleScheduleInstances: UseSuspenseQueryOptions<CommonRoleAssignmentScheduleInstance[]>[] = accounts.map(
-		account => ({
-			queryKey: ['pim', 'graphRoleScheduleInstances', account.localAccountId],
-			refetchInterval,
-			queryFn: async () => {
-				const instances = await getMyEntraRoleAssignmentScheduleInstances(account.localAccountId)
-				return instances.map(fromGraphAssignment)
-			},
-		})
-	)
-	const groupRoleScheduleInstances: UseSuspenseQueryOptions<CommonRoleAssignmentScheduleInstance[]>[] = accounts.map(
-		account => ({
-			queryKey: ['pim', 'groupRoleScheduleInstances', account.localAccountId],
-			refetchInterval,
-			queryFn: async () => {
-				const instances = await getMyEntraGroupAssignmentScheduleInstances(account.localAccountId)
-				return instances.map(fromGroupAssignment)
-			},
-		})
-	)
-
-	const armRoleSchedules: UseSuspenseQueryOptions<CommonRoleAssignmentSchedule[]>[] = accounts
+	const armRoleSchedules: UseQueryOptions<CommonRoleAssignmentSchedule[]>[] = accounts
 		.map(account => account.localAccountId)
 		.map(accountId => ({
 			queryKey: ['pim', 'armRoleSchedules', accountId],
@@ -150,7 +117,7 @@ export function useRoleTableQueries() {
 			},
 		}))
 
-	const graphRoleSchedules = accounts
+	const graphRoleSchedules: UseQueryOptions<CommonRoleAssignmentSchedule[]>[] = accounts
 		.map(account => account.localAccountId)
 		.map(accountId => ({
 			queryKey: ['pim', 'graphRoleSchedules', accountId],
@@ -161,7 +128,7 @@ export function useRoleTableQueries() {
 			},
 		}))
 
-	const groupRoleSchedules = accounts
+	const groupRoleSchedules: UseQueryOptions<CommonRoleAssignmentSchedule[]>[] = accounts
 		.map(account => account.localAccountId)
 		.map(accountId => ({
 			queryKey: ['pim', 'groupRoleSchedules', accountId],
@@ -172,26 +139,68 @@ export function useRoleTableQueries() {
 			},
 		}))
 
-	const roleAssignments = useQueries({
-		queries: [...armRoleScheduleInstances, ...graphRoleScheduleInstances, ...groupRoleScheduleInstances],
-		combine(result) {
-			return result.flatMap(r => r.data ?? [])
+	const roleScheduleQuery = useQueries({
+		queries: [...armRoleSchedules, ...graphRoleSchedules, ...groupRoleSchedules],
+		combine: results => {
+			return {
+				data: results.flatMap(result => result.data ?? []),
+				isLoading: results.some(result => result.isLoading),
+			}
 		},
 	})
 
-	const roleSchedules = useQueries({
-		queries: [...armRoleSchedules, ...graphRoleSchedules, ...groupRoleSchedules],
-		combine(result) {
-			return result.flatMap(r => r.data ?? [])
+	const armRoleScheduleInstances: UseQueryOptions<CommonRoleAssignmentScheduleInstance[]>[] = accounts.map(account => ({
+		queryKey: ['pim', 'armRoleScheduleInstances', account.localAccountId],
+		refetchInterval,
+		queryFn: async () => {
+			const instances = await Array.fromAsync(getMyRoleAssignmentScheduleInstances(account.localAccountId))
+			return instances.map(fromArmAssignment)
+		},
+	}))
+
+	const graphRoleScheduleInstances: UseQueryOptions<CommonRoleAssignmentScheduleInstance[]>[] = accounts.map(
+		account => ({
+			queryKey: ['pim', 'graphRoleScheduleInstances', account.localAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const instances = await getMyEntraRoleAssignmentScheduleInstances(account.localAccountId)
+				return instances.map(fromGraphAssignment)
+			},
+		})
+	)
+
+	const groupRoleScheduleInstances: UseQueryOptions<CommonRoleAssignmentScheduleInstance[]>[] = accounts.map(
+		account => ({
+			queryKey: ['pim', 'groupRoleScheduleInstances', account.localAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const instances = await getMyEntraGroupAssignmentScheduleInstances(account.localAccountId)
+				return instances.map(fromGroupAssignment)
+			},
+		})
+	)
+
+	const roleAssignmentQuery = useQueries({
+		queries: [...armRoleScheduleInstances, ...graphRoleScheduleInstances, ...groupRoleScheduleInstances],
+		combine: results => {
+			return {
+				data: results.flatMap(result => result.data ?? []),
+				isLoading: results.some(result => result.isLoading),
+				isPending: results.some(result => result.isPending),
+			}
 		},
 	})
 
 	// Must come last because we want the above to prefetch.
 	// TODO: Use proper prefetching
-	const eligibleRoles = useSuspenseQueries({
-		queries: [...armEligibleRolesQueries, ...graphEligibleRolesQueries, ...groupEligibleRolesQueries],
-		combine(result) {
-			return result.flatMap(r => r.data)
+	const eligibleRolesQuery = useQueries({
+		queries: [...armEligibleRoles, ...graphEligibleRoles, ...groupEligibleRoles],
+		combine: results => {
+			return {
+				data: results.flatMap(result => result.data ?? []),
+				isLoading: results.some(result => result.isLoading),
+				isPending: results.some(result => result.isPending),
+			}
 		},
 	})
 
@@ -199,10 +208,10 @@ export function useRoleTableQueries() {
 
 	const roleStatusQuery = useQuery<RoleToStatusLookup>({
 		// Key is too big, use last update instead ATM
-		queryKey: ['pim', 'eligibleRoleStatus', roleAssignments],
+		queryKey: ['pim', 'eligibleRoleStatus', roleAssignmentQuery.data],
 		queryFn: () =>
 			toRecord(
-				roleAssignments.filter(x => x.linkedRoleEligibilityScheduleInstanceId),
+				roleAssignmentQuery.data.filter(x => x.linkedRoleEligibilityScheduleInstanceId),
 				'linkedRoleEligibilityScheduleInstanceId'
 			),
 	})
@@ -253,7 +262,7 @@ export function useRoleTableQueries() {
 	return {
 		accountIds: accounts.map(account => account.localAccountId),
 		currentTab: undefined, // Placeholder as currentTab logic is commented out
-		eligibleRoles,
+		eligibleRolesQuery,
 		roleStatusQuery,
 		deactivateEligibleRoleMutation,
 		refresh,
