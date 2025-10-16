@@ -5,7 +5,7 @@ import {
 	UnifiedRoleAssignmentScheduleInstance,
 } from '@/api/generated/msgraph/models'
 import { throwError } from '@/api/util'
-import { RoleAssignmentSchedule } from '@azure/arm-authorization'
+import { KnownStatus, RoleAssignmentSchedule } from '@azure/arm-authorization'
 
 /**
  * Expanded interface for UnifiedRoleAssignmentSchedule with populated roleDefinition and principal
@@ -153,3 +153,6 @@ export function fromGroupAssignment(
 		sourceType: 'group',
 	}
 }
+
+/** We use this custom type to track when a role is being deactivated for faster UI responsiveness */
+export type RoleAssignmentStatus = KnownStatus | 'Deactivating'

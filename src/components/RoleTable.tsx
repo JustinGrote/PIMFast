@@ -3,7 +3,20 @@ import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { RoleSchedule } from '@/model/RoleSchedule'
 import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
-import { ActionIcon, Button, Center, Group, Modal, Paper, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
+import {
+	ActionIcon,
+	Button,
+	Center,
+	Group,
+	Loader,
+	Modal,
+	Paper,
+	Skeleton,
+	Stack,
+	Text,
+	TextInput,
+	Title,
+} from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
@@ -38,6 +51,7 @@ function RoleTable() {
 		refresh,
 		isEligibleRoleActivated,
 		isEligibleRoleNewlyActivated,
+		isEligibleRoleDeactivating,
 	} = useRoleTableQueries()
 
 	const handleActivateClick = useCallback(
@@ -230,15 +244,19 @@ function RoleTable() {
 							>
 								<Skeleton visible={!roleStatusQuery.isSuccess}>
 									{isEligibleRoleActivated(params.data) ? (
-										<IconPlayerStop
-											size="sm"
-											color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
-											title={
-												isEligibleRoleNewlyActivated(params.data)
-													? `Role must be active for at least 5 minutes before it can be disabled`
-													: 'Deactivate Role'
-											}
-										/>
+										isEligibleRoleDeactivating(params.data) ? (
+											<Loader size="sm" />
+										) : (
+											<IconPlayerStop
+												size="sm"
+												color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
+												title={
+													isEligibleRoleNewlyActivated(params.data)
+														? `Role must be active for at least 5 minutes before it can be disabled`
+														: 'Deactivate Role'
+												}
+											/>
+										)
 									) : (
 										<IconPlayerPlay
 											color="green"
@@ -261,8 +279,9 @@ function RoleTable() {
 			handleActivateClick,
 			isEligibleRoleActivated,
 			isEligibleRoleNewlyActivated,
+			isEligibleRoleDeactivating,
 			renderStatusCell,
-			roleStatusQuery.isSuccess,
+			roleStatusQuery,
 		]
 	)
 
@@ -333,16 +352,15 @@ function RoleTable() {
 						Eligible Roles
 					</Title>
 					<Group gap="xs">
-						{/* FIXME: This breaks Tenant Refresh because the invalidate removes the account that tenantName depends on. */}
-						{/* <Button
-								disabled={eligibleRolesQuery.isLoading}
-								variant="subtle"
-								color="green"
-								size="compact-sm"
-								onClick={refresh}
-							>
-								<IconRefresh />
-							</Button> */}
+						<Button
+							disabled={eligibleRolesQuery.isLoading}
+							variant="subtle"
+							color="green"
+							size="compact-sm"
+							onClick={refresh}
+						>
+							<IconRefresh />
+						</Button>
 						<Button
 							variant="subtle"
 							color="gray"

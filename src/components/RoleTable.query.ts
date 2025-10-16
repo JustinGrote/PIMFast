@@ -11,6 +11,7 @@ import {
 	fromArmAssignment,
 	fromGraphAssignment,
 	fromGroupAssignment,
+	RoleAssignmentStatus,
 } from '@/model/CommonRoleAssignmentScheduleInstance'
 import { RoleSchedule, fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/RoleSchedule'
 import { setCommonRoleScheduleAccount } from '@/model/EligibleRole'
@@ -191,8 +192,6 @@ export function useRoleTableQueries() {
 		},
 	})
 
-	// Must come last because we want the above to prefetch.
-	// TODO: Use proper prefetching
 	const eligibleRolesQuery = useQueries({
 		queries: [...armEligibleRoles, ...graphEligibleRoles, ...groupEligibleRoles],
 		combine: results => {
@@ -206,9 +205,11 @@ export function useRoleTableQueries() {
 
 	type RoleToStatusLookup = Record<string, CommonRoleAssignmentScheduleInstance | undefined>
 
+	/** This is so it can be referenced later */
+	const eligibleRoleStatusQueryKey = ['pim', 'eligibleRoleStatus']
 	const roleStatusQuery = useQuery<RoleToStatusLookup>({
 		// Key is too big, use last update instead ATM
-		queryKey: ['pim', 'eligibleRoleStatus', roleAssignmentQuery.data],
+		queryKey: eligibleRoleStatusQueryKey,
 		queryFn: () =>
 			toRecord(
 				roleAssignmentQuery.data.filter(x => x.linkedRoleEligibilityScheduleInstanceId),
@@ -218,7 +219,31 @@ export function useRoleTableQueries() {
 
 	const deactivateEligibleRoleMutation = useMutation({
 		mutationKey: ['deactivateEligibleRole'],
-		mutationFn: deactivateEligibleRole,
+		mutationFn: async (schedule: RoleSchedule) => {
+			// Set the eligible Role Status to 'Deactivating' optimistically.
+			queryClient.setQueryData(eligibleRoleStatusQueryKey, (oldData: RoleToStatusLookup | undefined) => {
+				if (!oldData) return oldData
+				return {
+					...oldData,
+					[schedule.id]: {
+						id: schedule.id,
+						roleDefinitionId: schedule.roleDefinitionId,
+						status: 'Deactivating',
+					},
+				}
+			})
+			const response = await deactivateEligibleRole(schedule)
+			if (response?.status === 'Revoked') {
+				// Optimistically remove the role status.
+				queryClient.setQueryData(eligibleRoleStatusQueryKey, (oldData: RoleToStatusLookup | undefined) => {
+					if (!oldData) return oldData
+					const newData = { ...oldData }
+					delete newData[schedule.id]
+					return newData
+				})
+			}
+			return response
+		},
 	})
 
 	/**
@@ -259,6 +284,12 @@ export function useRoleTableQueries() {
 		return dayjs().diff(dayjs(assignment.startDateTime), 'minutes') < AZURE_PIM_MIN_ACTIVATION_TIME
 	}
 
+	function isEligibleRoleDeactivating(schedule: RoleSchedule): boolean {
+		return roleStatusQuery.data
+			? (roleStatusQuery?.data[schedule.id]?.status as RoleAssignmentStatus) === 'Deactivating'
+			: false
+	}
+
 	return {
 		accountIds: accounts.map(account => account.localAccountId),
 		currentTab: undefined, // Placeholder as currentTab logic is commented out
@@ -268,5 +299,7 @@ export function useRoleTableQueries() {
 		refresh,
 		isEligibleRoleActivated,
 		isEligibleRoleNewlyActivated,
+		isEligibleRoleDeactivating,
 	}
 }
+
