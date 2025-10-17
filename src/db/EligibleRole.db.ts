@@ -1,5 +1,5 @@
 import { getMyRoleEligibilitySchedules } from '@/api/pim'
-import { getMyEntraRoleEligibilitySchedules, getMyEntraGroupEligibilitySchedules } from '@/api/pimGraph'
+import { getMyEntraGroupEligibilitySchedules, getMyEntraRoleEligibilitySchedules } from '@/api/pimGraph'
 import { getMilliseconds } from '@/api/time'
 import { setCommonRoleScheduleAccount } from '@/model/EligibleRole'
 import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule, RoleSchedule } from '@/model/RoleSchedule'
@@ -7,9 +7,9 @@ import { AccountInfo } from '@azure/msal-browser'
 import { useMsal } from '@azure/msal-react'
 import { createCollection } from '@tanstack/db'
 import { queryCollectionOptions } from '@tanstack/query-db-collection'
-import { QueryClient, useQueries, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
-import { useMemo } from 'react'
 import { useLiveQuery } from '@tanstack/react-db'
+import { useQueries, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
 const refetchInterval = getMilliseconds(30, 'seconds')
 
@@ -22,7 +22,7 @@ export function useEligibleRoleLiveQuery() {
 	*/
 	const accountHomeIdHash = accounts.map(a => a.homeAccountId).join('|')
 
-	// eslint-disable-next-line react-hooks/exhaustive-deps -- Using subset of accounts for dependency
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
 	const queries = useMemo(() => createQueryDefinitions(accounts), [accountHomeIdHash])
 	const eligibleRolesQuery = useQueries({
 		queries,
@@ -34,28 +34,21 @@ export function useEligibleRoleLiveQuery() {
 		},
 	})
 
-	const commonOptions = {
-		queryKey: ['pim', 'eligibleRoles', accountHomeIdHash],
-		enabled: !eligibleRolesQuery.isLoading,
-		queryFn: async () => eligibleRolesQuery.data,
-		refetchInterval,
-	}
-
-	// const eligibleRoleQueryDefinition: UseQueryOptions<RoleSchedule[]> = {
-	// 	...commonOptions,
-	// }
-
-	// const eligibleRoleQuery = useQuery(eligibleRoleQueryDefinition)
 	const collection = useMemo(
 		() =>
 			createCollection(
 				queryCollectionOptions({
-					...commonOptions,
+					// eslint-disable-next-line @tanstack/query/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
+					queryKey: ['pim', 'eligibleRoles', accountHomeIdHash],
+					enabled: !eligibleRolesQuery.isLoading,
+					queryFn: async () => eligibleRolesQuery.data,
+					refetchInterval,
 					queryClient,
 					getKey: role => role.id,
 				})
 			),
-		[queryClient, eligibleRolesQuery.data]
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
+		[queryClient, accountHomeIdHash]
 	)
 
 	const liveQuery = useLiveQuery(collection)
@@ -65,7 +58,7 @@ export function useEligibleRoleLiveQuery() {
 
 export function createQueryDefinitions(accounts: AccountInfo[]) {
 	const armQueries: UseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
-		queryKey: ['pim', 'armEligibleRoles', account.localAccountId],
+		queryKey: ['pim', 'armEligibleRoles', account.homeAccountId],
 		refetchInterval,
 		queryFn: async () => {
 			const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(account.localAccountId))
@@ -78,7 +71,7 @@ export function createQueryDefinitions(accounts: AccountInfo[]) {
 	}))
 
 	const graphQueries: UseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
-		queryKey: ['pim', 'graphEligibleRoles', account.localAccountId],
+		queryKey: ['pim', 'graphEligibleRoles', account.homeAccountId],
 		refetchInterval,
 		queryFn: async () => {
 			const schedules = await getMyEntraRoleEligibilitySchedules(account.localAccountId)
@@ -91,7 +84,7 @@ export function createQueryDefinitions(accounts: AccountInfo[]) {
 	}))
 
 	const groupQueries: UseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
-		queryKey: ['pim', 'groupEligibleRoles', account.localAccountId],
+		queryKey: ['pim', 'groupEligibleRoles', account.homeAccountId],
 		refetchInterval,
 		queryFn: async () => {
 			const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(account.localAccountId)
