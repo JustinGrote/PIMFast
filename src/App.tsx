@@ -1,16 +1,15 @@
-import PWABadge from './PWABadge.tsx'
-import './App.css'
-import { useMsal } from '@azure/msal-react'
-import { AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-react'
-import { scopesGraphAndAzure, setMsalInstance } from '@/api/auth.ts'
-import AccountTable from '@/components/AccountTable.tsx'
-import ErrorBoundary from '@/components/ErrorBoundary.tsx'
-import { Text, Button, Stack, Loader, Skeleton } from '@mantine/core'
+import { scopesGraphAndAzure, setMsalInstance } from '@/api/auth'
+import AccountTable from '@/components/AccountTable'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import { InteractionStatus } from '@azure/msal-browser'
+import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from '@azure/msal-react'
+import { Button, Loader, Skeleton, Stack, Text } from '@mantine/core'
 import { IconBrandAzure } from '@tabler/icons-react'
-import RoleTable from './components/RoleTable.tsx'
 import { useQueryClient } from '@tanstack/react-query'
 import { Suspense } from 'react'
+import './App.css'
+import RoleTable from './components/RoleTable'
+import PWABadge from './PWABadge'
 
 function App() {
 	const { instance, inProgress } = useMsal()
@@ -66,9 +65,7 @@ function App() {
 						<Suspense fallback={<Skeleton />}>
 							<AccountTable />
 						</Suspense>
-						<Suspense fallback={<Skeleton />}>
-							<RoleTable />
-						</Suspense>
+						<RoleTable />
 					</Stack>
 				</AuthenticatedTemplate>
 

@@ -192,6 +192,9 @@ export function useRoleTableQueries() {
 		},
 	})
 
+	// const collection = useEligibleRoleCollection(accounts, queryClient)
+
+	// const eligibleRolesLiveQuery = useLiveQuery(collection)
 	const eligibleRolesQuery = useQueries({
 		queries: [...armEligibleRoles, ...graphEligibleRoles, ...groupEligibleRoles],
 		combine: results => {
@@ -294,8 +297,8 @@ export function useRoleTableQueries() {
 		accountIds: accounts.map(account => account.localAccountId),
 		currentTab: undefined, // Placeholder as currentTab logic is commented out
 		eligibleRolesQuery,
-		roleStatusQuery,
-		deactivateEligibleRoleMutation,
+		// roleStatusQuery,
+		// deactivateEligibleRoleMutation,
 		refresh,
 		isEligibleRoleActivated,
 		isEligibleRoleNewlyActivated,

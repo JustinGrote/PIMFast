@@ -1,36 +1,23 @@
 import { getAzurePortalUrl } from '@/api/azureResourceId'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
-import { RoleSchedule } from '@/model/RoleSchedule'
+import { useEligibleRoleLiveQuery } from '@/db/EligibleRole.db'
 import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
-import {
-	ActionIcon,
-	Button,
-	Center,
-	Group,
-	Loader,
-	Modal,
-	Paper,
-	Skeleton,
-	Stack,
-	Text,
-	TextInput,
-	Title,
-} from '@mantine/core'
+import { RoleSchedule } from '@/model/RoleSchedule'
+import { useMsal } from '@azure/msal-react'
+import { Button, Group, Modal, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
+import { IconClearAll, IconRefresh, IconSearch } from '@tabler/icons-react'
+import { Collection, NonSingleResult, UtilsRecord } from '@tanstack/db'
+import { QueryCollectionUtils } from '@tanstack/query-db-collection'
 import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { Suspense, useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
-import ExpiresCountdown from './ExpiresCountdown'
 import MantineAgGridReact from './MantineAgGridReact'
-import ResolvedTenantName from './ResolvedTenantName'
-import { useRoleTableQueries } from './RoleTable.query'
-import { throwError } from '@/api/util'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -43,67 +30,69 @@ function RoleTable() {
 	const [gridApi, setGridApi] = useState<GridApi<RoleSchedule> | null>(null)
 	const [filterQuery, setFilterQuery] = useState('')
 
-	const {
-		accountIds,
-		eligibleRolesQuery,
-		roleStatusQuery,
-		deactivateEligibleRoleMutation,
-		refresh,
-		isEligibleRoleActivated,
-		isEligibleRoleNewlyActivated,
-		isEligibleRoleDeactivating,
-	} = useRoleTableQueries()
+	const { accounts } = useMsal()
+	const eligibleRolesQuery = useEligibleRoleLiveQuery()
+	// const {
+	// 	accountIds,
+	// 	eligibleRolesQuery,
+	// 	// roleStatusQuery,
+	// 	// deactivateEligibleRoleMutation,
+	// 	refresh,
+	// 	isEligibleRoleActivated,
+	// 	isEligibleRoleNewlyActivated,
+	// 	isEligibleRoleDeactivating,
+	// } = useRoleTableQueries()
 
-	const handleActivateClick = useCallback(
-		(eligibleRole: RoleSchedule) => {
-			setSelectedRole(eligibleRole)
-			if (!isEligibleRoleActivated(eligibleRole)) {
-				openActivationModal()
-			} else {
-				deactivateEligibleRoleMutation.mutate(eligibleRole)
-			}
-		},
-		[deactivateEligibleRoleMutation, isEligibleRoleActivated, openActivationModal]
-	)
+	// const handleActivateClick = useCallback(
+	// 	(eligibleRole: RoleSchedule) => {
+	// 		setSelectedRole(eligibleRole)
+	// 		if (!isEligibleRoleActivated(eligibleRole)) {
+	// 			openActivationModal()
+	// 		} else {
+	// 			deactivateEligibleRoleMutation.mutate(eligibleRole)
+	// 		}
+	// 	},
+	// 	[deactivateEligibleRoleMutation, isEligibleRoleActivated, openActivationModal]
+	// )
 
 	/**
 	 * Memoized renderer for the Status column to avoid recreating the function
 	 * on every render which can cause unnecessary AG Grid updates.
 	 */
-	const renderStatusCell = useCallback(
-		(params: { data: RoleSchedule }) => {
-			const isActivated = isEligibleRoleActivated(params.data)
-			const roleStatus = roleStatusQuery.data?.[params.data.id]
+	// const renderStatusCell = useCallback(
+	// 	(params: { data: RoleSchedule }) => {
+	// 		const isActivated = isEligibleRoleActivated(params.data)
+	// 		const roleStatus = roleStatusQuery.data?.[params.data.id]
 
-			if (isActivated && roleStatus?.endDateTime) {
-				return (
-					<Center style={{ width: '100%' }}>
-						<ExpiresCountdown
-							futureDate={roleStatus.endDateTime}
-							active={true}
-						/>
-					</Center>
-				)
-			}
+	// 		if (isActivated && roleStatus?.endDateTime) {
+	// 			return (
+	// 				<Center style={{ width: '100%' }}>
+	// 					<ExpiresCountdown
+	// 						futureDate={roleStatus.endDateTime}
+	// 						active={true}
+	// 					/>
+	// 				</Center>
+	// 			)
+	// 		}
 
-			return params.data.endDateTime ? (
-				<Center>
-					<ExpiresCountdown futureDate={params.data.endDateTime} />
-				</Center>
-			) : (
-				<Center>
-					<Text
-						size="sm"
-						style={{ textAlign: 'center' }}
-						title="No expiration"
-					>
-						Permanent
-					</Text>
-				</Center>
-			)
-		},
-		[isEligibleRoleActivated, roleStatusQuery.data]
-	)
+	// 		return params.data.endDateTime ? (
+	// 			<Center>
+	// 				<ExpiresCountdown futureDate={params.data.endDateTime} />
+	// 			</Center>
+	// 		) : (
+	// 			<Center>
+	// 				<Text
+	// 					size="sm"
+	// 					style={{ textAlign: 'center' }}
+	// 					title="No expiration"
+	// 				>
+	// 					Permanent
+	// 				</Text>
+	// 			</Center>
+	// 		)
+	// 	},
+	// 	[isEligibleRoleActivated, roleStatusQuery.data]
+	// )
 
 	const columnDefs: ColDef<RoleSchedule>[] = useMemo(
 		() => [
@@ -184,7 +173,7 @@ function RoleTable() {
 				flex: 1,
 				sortable: true,
 				resizable: true,
-				hide: accountIds.length <= 1,
+				hide: accounts.length <= 1,
 				valueGetter: params => {
 					const account = params.data ? getCommonRoleScheduleAccount(params.data) : undefined
 					if (!account) {
@@ -193,102 +182,93 @@ function RoleTable() {
 					return account.name
 				},
 			},
-			{
-				headerName: 'Tenant',
-				cellRenderer: (params: { data: RoleSchedule }) => {
-					return (
-						<Suspense fallback={<Skeleton>Fetching Tenant Info</Skeleton>}>
-							<ResolvedTenantName
-								role={params.data}
-								account={
-									getCommonRoleScheduleAccount(params.data) ??
-									throwError('Account not found in Role to Account Map. This is a bug')
-								}
-							/>
-						</Suspense>
-					)
-				},
-				flex: 1,
-				sortable: false,
-				resizable: true,
-			},
-			{
-				headerName: 'Status',
-				cellRenderer: renderStatusCell,
-				width: 100,
-				sortable: false,
-				resizable: true,
-				valueGetter: params => params.data?.endDateTime || '',
-				suppressColumnsToolPanel: true,
-				lockVisible: true,
-			},
-			{
-				headerName: '',
-				headerComponent: () => (
-					<Center>
-						<IconClick size={16} />
-					</Center>
-				),
-				cellRenderer: (params: { data: RoleSchedule }) => (
-					<div className="one-line-row">
-						<Group>
-							<ActionIcon
-								variant="subtle"
-								disabled={isEligibleRoleNewlyActivated(params.data)}
-								onClick={() => {
-									handleActivateClick(params.data)
-								}}
-								loaderProps={{
-									color: 'blue',
-								}}
-							>
-								<Skeleton visible={!roleStatusQuery.isSuccess}>
-									{isEligibleRoleActivated(params.data) ? (
-										isEligibleRoleDeactivating(params.data) ? (
-											<Loader size="sm" />
-										) : (
-											<IconPlayerStop
-												size="sm"
-												color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
-												title={
-													isEligibleRoleNewlyActivated(params.data)
-														? `Role must be active for at least 5 minutes before it can be disabled`
-														: 'Deactivate Role'
-												}
-											/>
-										)
-									) : (
-										<IconPlayerPlay
-											color="green"
-											title="Activate Role"
-										/>
-									)}
-								</Skeleton>
-							</ActionIcon>
-						</Group>
-					</div>
-				),
-				width: 35,
-				pinned: 'right',
-				sortable: false,
-				resizable: false,
-			},
+			// {
+			// 	headerName: 'Tenant',
+			// 	cellRenderer: (params: { data: RoleSchedule }) => {
+			// 		return (
+			// 			<Suspense fallback={<Skeleton>Fetching Tenant Info</Skeleton>}>
+			// 				<ResolvedTenantName
+			// 					role={params.data}
+			// 					account={
+			// 						getCommonRoleScheduleAccount(params.data) ??
+			// 						throwError('Account not found in Role to Account Map. This is a bug')
+			// 					}
+			// 				/>
+			// 			</Suspense>
+			// 		)
+			// 	},
+			// 	flex: 1,
+			// 	sortable: false,
+			// 	resizable: true,
+			// },
+			// {
+			// 	headerName: 'Status',
+			// 	cellRenderer: renderStatusCell,
+			// 	width: 100,
+			// 	sortable: false,
+			// 	resizable: true,
+			// 	valueGetter: params => params.data?.endDateTime || '',
+			// 	suppressColumnsToolPanel: true,
+			// 	lockVisible: true,
+			// },
+			// {
+			// 	headerName: '',
+			// 	headerComponent: () => (
+			// 		<Center>
+			// 			<IconClick size={16} />
+			// 		</Center>
+			// 	),
+			// 	cellRenderer: (params: { data: RoleSchedule }) => (
+			// 		<div className="one-line-row">
+			// 			<Group>
+			// 				<ActionIcon
+			// 					variant="subtle"
+			// 					disabled={isEligibleRoleNewlyActivated(params.data)}
+			// 					onClick={() => {
+			// 						handleActivateClick(params.data)
+			// 					}}
+			// 					loaderProps={{
+			// 						color: 'blue',
+			// 					}}
+			// 				>
+			// 					<Skeleton visible={!roleStatusQuery.isSuccess}>
+			// 						{isEligibleRoleActivated(params.data) ? (
+			// 							isEligibleRoleDeactivating(params.data) ? (
+			// 								<Loader size="sm" />
+			// 							) : (
+			// 								<IconPlayerStop
+			// 									size="sm"
+			// 									color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
+			// 									title={
+			// 										isEligibleRoleNewlyActivated(params.data)
+			// 											? `Role must be active for at least 5 minutes before it can be disabled`
+			// 											: 'Deactivate Role'
+			// 									}
+			// 								/>
+			// 							)
+			// 						) : (
+			// 							<IconPlayerPlay
+			// 								color="green"
+			// 								title="Activate Role"
+			// 							/>
+			// 						)}
+			// 					</Skeleton>
+			// 				</ActionIcon>
+			// 			</Group>
+			// 		</div>
+			// 	),
+			// 	width: 35,
+			// 	pinned: 'right',
+			// 	sortable: false,
+			// 	resizable: false,
+			// },
 		],
-		[
-			accountIds.length,
-			handleActivateClick,
-			isEligibleRoleActivated,
-			isEligibleRoleNewlyActivated,
-			isEligibleRoleDeactivating,
-			renderStatusCell,
-			roleStatusQuery,
-		]
+		[accounts]
 	)
 
 	// Filter the eligible roles based on search query
 	const filteredRoles = useMemo(() => {
 		let filtered: RoleSchedule[] = eligibleRolesQuery.data
-
 		// Apply search filter
 		if (filterQuery) {
 			const lowerQuery = filterQuery.toLowerCase()
@@ -331,10 +311,8 @@ function RoleTable() {
 	// }
 
 	const resetView = () => {
-		if (gridApi) {
-			gridApi.resetColumnState()
-			gridApi.resetQuickFilter()
-		}
+		gridApi?.resetColumnState()
+		gridApi?.resetQuickFilter()
 	}
 
 	return (
@@ -357,7 +335,7 @@ function RoleTable() {
 							variant="subtle"
 							color="green"
 							size="compact-sm"
-							onClick={refresh}
+							// onClick={() => refresh()}
 						>
 							<IconRefresh />
 						</Button>
