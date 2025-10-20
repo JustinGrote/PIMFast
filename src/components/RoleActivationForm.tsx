@@ -2,7 +2,7 @@ import { activateEligibleRole } from '@/api/pim'
 import { throwError } from '@/api/util'
 import { CommonRoleActivateRequest } from '@/model/CommonRoleActivateRequest'
 import { RoleSchedule } from '@/model/RoleSchedule'
-import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
+import { getRoleScheduleAccount } from '@/model/EligibleRole'
 import { Button, Group, Modal, Slider, Stack, Text, Textarea, TextInput, Title } from '@mantine/core'
 import { DateTimePicker } from '@mantine/dates'
 import { useForm } from '@mantine/form'
@@ -56,7 +56,7 @@ export function RoleActivationForm({
 }: RoleActivationFormProps) {
 	const [errorModalOpened, { open: openErrorModal, close: closeErrorModal }] = useDisclosure(false)
 	const [errorMessage, setErrorMessage] = useState('')
-	const account = getCommonRoleScheduleAccount(schedule)
+	const account = getRoleScheduleAccount(schedule)
 
 	const form = useForm<FormValues>({
 		mode: 'uncontrolled',

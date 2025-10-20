@@ -2,22 +2,24 @@ import { getAzurePortalUrl } from '@/api/azureResourceId'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { useEligibleRoleLiveQuery } from '@/db/EligibleRole.db'
-import { getCommonRoleScheduleAccount } from '@/model/EligibleRole'
+import { getRoleScheduleAccount } from '@/model/EligibleRole'
 import { RoleSchedule } from '@/model/RoleSchedule'
 import { useMsal } from '@azure/msal-react'
-import { Button, Group, Modal, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Button, Group, Modal, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconClearAll, IconRefresh, IconSearch } from '@tabler/icons-react'
-import { Collection, NonSingleResult, UtilsRecord } from '@tanstack/db'
-import { QueryCollectionUtils } from '@tanstack/query-db-collection'
 import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
 import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { useMemo, useState } from 'react'
+import { memo, Suspense, useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import MantineAgGridReact from './MantineAgGridReact'
+import { useQueryClient } from '@tanstack/react-query'
+import RoleScope from './RoleScope'
+import { throwError } from '@/api/util'
+import ResolvedTenantName from './ResolvedTenantName'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -32,6 +34,7 @@ function RoleTable() {
 
 	const { accounts } = useMsal()
 	const eligibleRolesQuery = useEligibleRoleLiveQuery()
+	const queryClient = useQueryClient()
 	// const {
 	// 	accountIds,
 	// 	eligibleRolesQuery,
@@ -54,11 +57,6 @@ function RoleTable() {
 	// 	},
 	// 	[deactivateEligibleRoleMutation, isEligibleRoleActivated, openActivationModal]
 	// )
-
-	/**
-	 * Memoized renderer for the Status column to avoid recreating the function
-	 * on every render which can cause unnecessary AG Grid updates.
-	 */
 	// const renderStatusCell = useCallback(
 	// 	(params: { data: RoleSchedule }) => {
 	// 		const isActivated = isEligibleRoleActivated(params.data)
@@ -110,44 +108,7 @@ function RoleTable() {
 			},
 			{
 				headerName: 'Scope',
-				cellRenderer: (params: { data: RoleSchedule }) => {
-					const icon = match(params.data.scopeType)
-						.with('resourcegroup', () => <ResourceGroups />)
-						.with('subscription', () => <Subscriptions />)
-						.with('managementgroup', () => <ManagementGroups />)
-						.with('directory', () => <EntraConnect />)
-						.with('group', () => <Groups />)
-						.otherwise(() => <AzureResource />)
-					const displayName = params.data.scopeDisplayName ?? 'unknown'
-					const portalUrl = params.data.scope ? getAzurePortalUrl(params.data.scope, params.data.scopeType) : '#'
-
-					return (
-						<Group
-							gap="xs"
-							wrap="nowrap"
-							style={{ minWidth: 0, flex: 1 }}
-						>
-							{icon}
-							<a
-								href={portalUrl}
-								target="_blank"
-								rel="noopener noreferrer"
-								title={params.data.scope ?? ''}
-								style={{
-									textDecoration: 'none',
-									color: 'inherit',
-									overflow: 'hidden',
-									textOverflow: 'ellipsis',
-									whiteSpace: 'nowrap',
-									minWidth: 0,
-									flex: 1,
-								}}
-							>
-								{displayName}
-							</a>
-						</Group>
-					)
-				},
+				cellRenderer: memo(RoleScope),
 				flex: 2,
 				sortable: true,
 				resizable: true,
@@ -156,7 +117,7 @@ function RoleTable() {
 			{
 				headerName: 'Account',
 				cellRenderer: (params: { data: RoleSchedule }) => {
-					const account = getCommonRoleScheduleAccount(params.data)
+					const account = getRoleScheduleAccount(params.data)
 					if (!account) {
 						return <Text size="sm">Unknown account</Text>
 					}
@@ -175,32 +136,32 @@ function RoleTable() {
 				resizable: true,
 				hide: accounts.length <= 1,
 				valueGetter: params => {
-					const account = params.data ? getCommonRoleScheduleAccount(params.data) : undefined
+					const account = params.data ? getRoleScheduleAccount(params.data) : undefined
 					if (!account) {
 						return ''
 					}
 					return account.name
 				},
 			},
-			// {
-			// 	headerName: 'Tenant',
-			// 	cellRenderer: (params: { data: RoleSchedule }) => {
-			// 		return (
-			// 			<Suspense fallback={<Skeleton>Fetching Tenant Info</Skeleton>}>
-			// 				<ResolvedTenantName
-			// 					role={params.data}
-			// 					account={
-			// 						getCommonRoleScheduleAccount(params.data) ??
-			// 						throwError('Account not found in Role to Account Map. This is a bug')
-			// 					}
-			// 				/>
-			// 			</Suspense>
-			// 		)
-			// 	},
-			// 	flex: 1,
-			// 	sortable: false,
-			// 	resizable: true,
-			// },
+			{
+				headerName: 'Tenant',
+				cellRenderer: (params: { data: RoleSchedule }) => {
+					return (
+						<Suspense fallback={<Skeleton>Fetching Tenant Info</Skeleton>}>
+							<ResolvedTenantName
+								role={params.data}
+								account={
+									getRoleScheduleAccount(params.data) ??
+									throwError('Account not found in Role to Account Map. This is a bug')
+								}
+							/>
+						</Suspense>
+					)
+				},
+				flex: 1,
+				sortable: false,
+				resizable: true,
+			},
 			// {
 			// 	headerName: 'Status',
 			// 	cellRenderer: renderStatusCell,
@@ -273,7 +234,7 @@ function RoleTable() {
 		if (filterQuery) {
 			const lowerQuery = filterQuery.toLowerCase()
 			filtered = filtered.filter(role => {
-				const account = getCommonRoleScheduleAccount(role)
+				const account = getRoleScheduleAccount(role)
 				const accountName = account?.name?.toLowerCase() || ''
 				const roleName = role.roleDefinitionDisplayName?.toLowerCase() || ''
 				const scopeName = role.scopeDisplayName?.toLowerCase() || ''
@@ -335,7 +296,8 @@ function RoleTable() {
 							variant="subtle"
 							color="green"
 							size="compact-sm"
-							// onClick={() => refresh()}
+							// TODO: Centralize this behavior
+							onClick={() => queryClient.invalidateQueries({ queryKey: ['pim'] })}
 						>
 							<IconRefresh />
 						</Button>

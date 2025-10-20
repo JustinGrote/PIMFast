@@ -1,7 +1,7 @@
 import { getMyRoleEligibilitySchedules } from '@/api/pim'
 import { getMyEntraGroupEligibilitySchedules, getMyEntraRoleEligibilitySchedules } from '@/api/pimGraph'
 import { getMilliseconds } from '@/api/time'
-import { setCommonRoleScheduleAccount } from '@/model/EligibleRole'
+import { setRoleScheduleAccount } from '@/model/EligibleRole'
 import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule, RoleSchedule } from '@/model/RoleSchedule'
 import { AccountInfo } from '@azure/msal-browser'
 import { useMsal } from '@azure/msal-react'
@@ -10,7 +10,6 @@ import { queryCollectionOptions } from '@tanstack/query-db-collection'
 import { useLiveQuery } from '@tanstack/react-db'
 import { useQueries, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
 import { useMemo } from 'react'
-
 const refetchInterval = getMilliseconds(30, 'seconds')
 
 export function useEligibleRoleLiveQuery() {
@@ -47,53 +46,57 @@ export function useEligibleRoleLiveQuery() {
 					getKey: role => role.id,
 				})
 			),
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
-		[queryClient, accountHomeIdHash]
+		[queryClient, accountHomeIdHash, eligibleRolesQuery.data, eligibleRolesQuery.isLoading]
 	)
 
 	const liveQuery = useLiveQuery(collection)
-
 	return liveQuery
 }
 
 export function createQueryDefinitions(accounts: AccountInfo[]) {
-	const armQueries: UseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
-		queryKey: ['pim', 'armEligibleRoles', account.homeAccountId],
-		refetchInterval,
-		queryFn: async () => {
-			const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(account.localAccountId))
-			return schedules.map<RoleSchedule>(schedule => {
-				const commonSchedule = fromArmSchedule(schedule)
-				setCommonRoleScheduleAccount(commonSchedule, account)
-				return commonSchedule
-			})
-		},
-	}))
+	// NOTE: This is used to ensure the queries are returned in a stable order
+	const queries: UseQueryOptions<RoleSchedule[]>[] = []
 
-	const graphQueries: UseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
-		queryKey: ['pim', 'graphEligibleRoles', account.homeAccountId],
-		refetchInterval,
-		queryFn: async () => {
-			const schedules = await getMyEntraRoleEligibilitySchedules(account.localAccountId)
-			return schedules.map(schedule => {
-				const commonSchedule = fromGraphSchedule(schedule)
-				setCommonRoleScheduleAccount(commonSchedule, account)
-				return commonSchedule
-			})
-		},
-	}))
+	for (const account of accounts) {
+		queries.push({
+			queryKey: ['pim', 'graphEligibleRoles', account.homeAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const schedules = await getMyEntraRoleEligibilitySchedules(account.localAccountId)
+				return schedules.map(schedule => {
+					const commonSchedule = fromGraphSchedule(schedule)
+					setRoleScheduleAccount(commonSchedule, account)
+					return commonSchedule
+				})
+			},
+		})
 
-	const groupQueries: UseQueryOptions<RoleSchedule[]>[] = accounts.map(account => ({
-		queryKey: ['pim', 'groupEligibleRoles', account.homeAccountId],
-		refetchInterval,
-		queryFn: async () => {
-			const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(account.localAccountId)
-			return groupScheduleResult.map<RoleSchedule>(schedule => {
-				const commonSchedule = fromGroupSchedule(schedule)
-				setCommonRoleScheduleAccount(commonSchedule, account)
-				return commonSchedule
-			})
-		},
-	}))
-	return [...armQueries, ...graphQueries, ...groupQueries]
+		queries.push({
+			queryKey: ['pim', 'armEligibleRoles', account.homeAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(account.localAccountId))
+				return schedules.map<RoleSchedule>(schedule => {
+					const commonSchedule = fromArmSchedule(schedule)
+					setRoleScheduleAccount(commonSchedule, account)
+					return commonSchedule
+				})
+			},
+		})
+
+		queries.push({
+			queryKey: ['pim', 'groupEligibleRoles', account.homeAccountId],
+			refetchInterval,
+			queryFn: async () => {
+				const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(account.localAccountId)
+				return groupScheduleResult.map<RoleSchedule>(schedule => {
+					const commonSchedule = fromGroupSchedule(schedule)
+					setRoleScheduleAccount(commonSchedule, account)
+					return commonSchedule
+				})
+			},
+		})
+	}
+
+	return queries
 }

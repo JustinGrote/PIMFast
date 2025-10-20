@@ -3,7 +3,7 @@ import {
 	UnifiedRoleAssignmentScheduleInstanceExpanded,
 } from '@/model/CommonRoleAssignmentScheduleInstance'
 import { RoleSchedule, PrivilegedAccessGroupEligibilityScheduleExpanded } from '@/model/RoleSchedule'
-import { AccountInfoOrId, getCommonRoleScheduleAccount } from '@/model/EligibleRole'
+import { AccountInfoOrId, getRoleScheduleAccount } from '@/model/EligibleRole'
 import { AccountInfo } from '@azure/msal-browser'
 import { AzureIdentityAuthenticationProvider } from '@microsoft/kiota-authentication-azure'
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary'
@@ -189,7 +189,7 @@ export const createEntraGroupAssignmentScheduleRequest = (
  * @returns A promise resolving to the updated request object.
  */
 export const deactivateEntraGroupAssignmentScheduleRequest = async (schedule: RoleSchedule) => {
-	const account = getCommonRoleScheduleAccount(schedule) ?? throwError('Account missing for group deactivation')
+	const account = getRoleScheduleAccount(schedule) ?? throwError('Account missing for group deactivation')
 	return getPimClient(account).identityGovernance.privilegedAccess.group.assignmentScheduleRequests.post({
 		action: 'selfDeactivate',
 		principalId: schedule.principalId,
@@ -207,7 +207,7 @@ export const deactivateEntraGroupAssignmentScheduleRequest = async (schedule: Ro
  * @returns A promise resolving to the updated request object.
  */
 export const deactivateEntraRoleAssignmentScheduleRequest = async (schedule: RoleSchedule) => {
-	const account = getCommonRoleScheduleAccount(schedule) ?? throwError('Account missing for role deactivation')
+	const account = getRoleScheduleAccount(schedule) ?? throwError('Account missing for role deactivation')
 	return getPimClient(account).roleManagement.directory.roleAssignmentScheduleRequests.post({
 		action: 'selfDeactivate',
 		principalId: schedule.principalId,

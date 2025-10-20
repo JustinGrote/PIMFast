@@ -14,7 +14,7 @@ import {
 	RoleAssignmentStatus,
 } from '@/model/CommonRoleAssignmentScheduleInstance'
 import { RoleSchedule, fromArmSchedule, fromGraphSchedule, fromGroupSchedule } from '@/model/RoleSchedule'
-import { setCommonRoleScheduleAccount } from '@/model/EligibleRole'
+import { setRoleScheduleAccount } from '@/model/EligibleRole'
 import { KnownStatus } from '@azure/arm-authorization'
 import { useMsal } from '@azure/msal-react'
 import {
@@ -75,7 +75,7 @@ export function useRoleTableQueries() {
 			const schedules = await Array.fromAsync(getMyRoleEligibilitySchedules(account.localAccountId))
 			return schedules.map<RoleSchedule>(schedule => {
 				const commonSchedule = fromArmSchedule(schedule)
-				setCommonRoleScheduleAccount(commonSchedule, account)
+				setRoleScheduleAccount(commonSchedule, account)
 				return commonSchedule
 			})
 		},
@@ -88,7 +88,7 @@ export function useRoleTableQueries() {
 			const schedules = await getMyEntraRoleEligibilitySchedules(account.localAccountId)
 			return schedules.map(schedule => {
 				const commonSchedule = fromGraphSchedule(schedule)
-				setCommonRoleScheduleAccount(commonSchedule, account)
+				setRoleScheduleAccount(commonSchedule, account)
 				return commonSchedule
 			})
 		},
@@ -101,7 +101,7 @@ export function useRoleTableQueries() {
 			const groupScheduleResult = await getMyEntraGroupEligibilitySchedules(account.localAccountId)
 			return groupScheduleResult.map<RoleSchedule>(schedule => {
 				const commonSchedule = fromGroupSchedule(schedule)
-				setCommonRoleScheduleAccount(commonSchedule, account)
+				setRoleScheduleAccount(commonSchedule, account)
 				return commonSchedule
 			})
 		},

@@ -8,7 +8,7 @@ const commonRoleScheduleAccountMap: Record<string, AccountInfo> = {}
  * // schedule - The schedule reference to associate
  * // account - The account returned from MSAL for the schedule owner
  */
-export const setCommonRoleScheduleAccount = (schedule: RoleSchedule, account: AccountInfo) => {
+export const setRoleScheduleAccount = (schedule: RoleSchedule, account: AccountInfo) => {
 	commonRoleScheduleAccountMap[schedule.id] = account
 }
 
@@ -16,7 +16,7 @@ export const setCommonRoleScheduleAccount = (schedule: RoleSchedule, account: Ac
  * Retrieves the account previously associated with a schedule.
  * // schedule - The schedule reference to lookup
  */
-export const getCommonRoleScheduleAccount = (schedule: RoleSchedule) => commonRoleScheduleAccountMap[schedule.id]
+export const getRoleScheduleAccount = (schedule: RoleSchedule) => commonRoleScheduleAccountMap[schedule.id]
 
 /** A reduced set of Account Info that redacts sensitive info and has less changes */
 export type AccountInfoDisplay = Pick<

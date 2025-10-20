@@ -1,7 +1,7 @@
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
-import react from '@vitejs/plugin-react-swc'
+import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
@@ -19,7 +19,11 @@ export default defineConfig({
 		},
 	},
 	plugins: [
-		react(),
+		react({
+			babel: {
+				plugins: ['babel-plugin-react-compiler'],
+			},
+		}),
 		// Fixes an error with vite and punycode, since we only use node for the build process
 		nodePolyfills(),
 		cloudflare(),
