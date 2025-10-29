@@ -2,8 +2,8 @@ import { getAzurePortalUrl } from '@/api/azureResourceId'
 import { AzureResource } from '@/components/icons/AzureResource'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { useEligibleRoleLiveQuery } from '@/db/EligibleRole.db'
-import { getRoleScheduleAccount } from '@/model/EligibleRole'
-import { RoleSchedule } from '@/model/RoleSchedule'
+import { getRoleScheduleAccount, setRoleScheduleAccount } from '@/model/EligibleRole'
+import { fromGraphSchedule, RoleSchedule } from '@/model/RoleSchedule'
 import { useMsal } from '@azure/msal-react'
 import { Button, Group, Modal, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
@@ -13,18 +13,19 @@ import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { memo, Suspense, useMemo, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import MantineAgGridReact from './MantineAgGridReact'
 import { useQueryClient } from '@tanstack/react-query'
 import RoleScope from './RoleScope'
 import { throwError } from '@/api/util'
 import ResolvedTenantName from './ResolvedTenantName'
+import { createCollection, useLiveQuery } from '@tanstack/react-db'
+import { getMyEntraRoleEligibilitySchedules } from '@/api/pimGraph'
+import { queryCollectionOptions } from '@tanstack/query-db-collection'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
-
-// FIXME: Handle if a tenant doesn't have P2 license
 
 function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
@@ -33,8 +34,11 @@ function RoleTable() {
 	const [filterQuery, setFilterQuery] = useState('')
 
 	const { accounts } = useMsal()
-	const eligibleRolesQuery = useEligibleRoleLiveQuery()
 	const queryClient = useQueryClient()
+	const accountsHash = accounts.map(a => a.homeAccountId).join('|')
+
+	const eligibleRolesQuery = useEligibleRoleLiveQuery(accountsHash)
+
 	// const {
 	// 	accountIds,
 	// 	eligibleRolesQuery,
@@ -228,27 +232,22 @@ function RoleTable() {
 	)
 
 	// Filter the eligible roles based on search query
-	const filteredRoles = useMemo(() => {
-		let filtered: RoleSchedule[] = eligibleRolesQuery.data
-		// Apply search filter
-		if (filterQuery) {
-			const lowerQuery = filterQuery.toLowerCase()
-			filtered = filtered.filter(role => {
-				const account = getRoleScheduleAccount(role)
-				const accountName = account?.name?.toLowerCase() || ''
-				const roleName = role.roleDefinitionDisplayName?.toLowerCase() || ''
-				const scopeName = role.scopeDisplayName?.toLowerCase() || ''
-				// TODO: Fix tenant search
-
-				return (
-					accountName.includes(lowerQuery) || roleName.includes(lowerQuery) || scopeName.includes(lowerQuery)
-					// tenantName.includes(lowerQuery)
-				)
-			})
+	const filteredRoles: RoleSchedule[] = (() => {
+		const base = [...eligibleRolesQuery.data]
+		if (!filterQuery) {
+			return base
 		}
+		const lowerQuery = filterQuery.toLowerCase()
+		return base.filter(role => {
+			const account = getRoleScheduleAccount(role)
+			const accountName = account?.name?.toLowerCase() || ''
+			const roleName = role.roleDefinitionDisplayName?.toLowerCase() || ''
+			const scopeName = role.scopeDisplayName?.toLowerCase() || ''
+			// TODO: Fix tenant search
 
-		return filtered
-	}, [filterQuery, eligibleRolesQuery.data])
+			return accountName.includes(lowerQuery) || roleName.includes(lowerQuery) || scopeName.includes(lowerQuery)
+		})
+	})()
 
 	const onGridReady = (params: GridReadyEvent<RoleSchedule>) => {
 		setGridApi(params.api)
@@ -275,6 +274,9 @@ function RoleTable() {
 		gridApi?.resetColumnState()
 		gridApi?.resetQuickFilter()
 	}
+
+	// Re-render grid when loading or rowData changes
+	const gridKey = `${eligibleRolesQuery.isLoading ? 'loading' : 'ready'}-${filteredRoles.map(r => r.id).join('|')}`
 
 	return (
 		<>
@@ -321,6 +323,7 @@ function RoleTable() {
 				/>
 
 				<MantineAgGridReact<RoleSchedule>
+					key={gridKey}
 					className="roleTable"
 					loading={eligibleRolesQuery.isLoading}
 					rowData={filteredRoles}

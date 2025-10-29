@@ -31,7 +31,7 @@ type Tenant = Pick<TenantIdDescription, 'tenantId' | 'displayName' | 'defaultDom
 function ResolvedTenantName({ role, account }: { role: RoleSchedule; account: AccountInfo }) {
 	const { data: tenantInfoLookup, isSuccess: tenantsFetched } = useSuspenseQuery<Record<string, Tenant>>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
-		queryKey: ['tenants', account.localAccountId],
+		queryKey: ['tenants', account.homeAccountId],
 		queryFn: async () => {
 			const tenants = await fetchTenants(account)
 			return toRecord(tenants, 'tenantId')
@@ -46,7 +46,7 @@ function ResolvedTenantName({ role, account }: { role: RoleSchedule; account: Ac
 		error,
 	} = useQuery<Tenant>({
 		// eslint-disable-next-line @tanstack/query/exhaustive-deps
-		queryKey: ['pim', 'tenant', account.localAccountId],
+		queryKey: ['pim', 'tenant', account.homeAccountId],
 		enabled: tenantsFetched && Boolean(account),
 		retry: false,
 		queryFn: async () => {

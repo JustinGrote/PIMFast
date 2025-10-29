@@ -12,17 +12,16 @@ import { useQueries, useQueryClient, UseQueryOptions } from '@tanstack/react-que
 import { useMemo } from 'react'
 const refetchInterval = getMilliseconds(30, 'seconds')
 
-export function useEligibleRoleLiveQuery() {
+export function useEligibleRoleLiveQuery(accountsHash: string) {
 	const queryClient = useQueryClient()
 	const { accounts } = useMsal()
 
 	/** By using a hash of the unique IDs, this avoids excessively recalculating the collection when account timestamps change
 	but does recalculate when accounts are added or removed
 	*/
-	const accountHomeIdHash = accounts.map(a => a.homeAccountId).join('|')
 
 	// eslint-disable-next-line react-hooks/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
-	const queries = useMemo(() => createQueryDefinitions(accounts), [accountHomeIdHash])
+	const queries = useMemo(() => createQueryDefinitions(accounts), [accountsHash])
 	const eligibleRolesQuery = useQueries({
 		queries,
 		combine: result => {
@@ -38,7 +37,7 @@ export function useEligibleRoleLiveQuery() {
 			createCollection(
 				queryCollectionOptions({
 					// eslint-disable-next-line @tanstack/query/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
-					queryKey: ['pim', 'eligibleRoles', accountHomeIdHash],
+					queryKey: ['pim', 'eligibleRoles', accountsHash],
 					enabled: !eligibleRolesQuery.isLoading,
 					queryFn: async () => eligibleRolesQuery.data,
 					refetchInterval,
@@ -46,7 +45,7 @@ export function useEligibleRoleLiveQuery() {
 					getKey: role => role.id,
 				})
 			),
-		[queryClient, accountHomeIdHash, eligibleRolesQuery.data, eligibleRolesQuery.isLoading]
+		[accountsHash]
 	)
 
 	const liveQuery = useLiveQuery(collection)
