@@ -1,6 +1,8 @@
+import { ObjectMappingMetadataObject } from '@/api/generated/msgraph/models'
 import { getMyRoleEligibilitySchedules } from '@/api/pim'
 import { getMyEntraGroupEligibilitySchedules, getMyEntraRoleEligibilitySchedules } from '@/api/pimGraph'
 import { getMilliseconds } from '@/api/time'
+import { throwIfNotError } from '@/api/util'
 import { setRoleScheduleAccount } from '@/model/EligibleRole'
 import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule, RoleSchedule } from '@/model/RoleSchedule'
 import { AccountInfo } from '@azure/msal-browser'
@@ -9,50 +11,69 @@ import { createCollection } from '@tanstack/db'
 import { queryCollectionOptions } from '@tanstack/query-db-collection'
 import { useLiveQuery } from '@tanstack/react-db'
 import { useQueries, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
-import { useMemo } from 'react'
-const refetchInterval = getMilliseconds(30, 'seconds')
+import { useEffect, useMemo, useState } from 'react'
+const refetchInterval = getMilliseconds(5, 'seconds')
 
 export function useEligibleRoleLiveQuery(accountsHash: string) {
 	const queryClient = useQueryClient()
 	const { accounts } = useMsal()
+	const [queryKey] = useState(() => ['pim', 'eligibleRoles'])
 
-	/** By using a hash of the unique IDs, this avoids excessively recalculating the collection when account timestamps change
-	but does recalculate when accounts are added or removed
-	*/
+	// Clean up inactive eligible role queries
+	queryClient.removeQueries({ queryKey: ['pim'], type: 'inactive' })
 
-	// eslint-disable-next-line react-hooks/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
-	const queries = useMemo(() => createQueryDefinitions(accounts), [accountsHash])
-	const eligibleRolesQuery = useQueries({
-		queries,
-		combine: result => {
-			return {
-				isLoading: result.some(r => r.isLoading),
-				data: result.flatMap(r => r.data ?? []),
-			}
-		},
-	})
+	const queries = useMemo(() => createQueryDefinitions(accounts), [accountsHash, accounts])
+	const queryResults = useQueries({ queries })
 
+	// NOTE: This collection is effectively a singleton, it doesn't need recreating when accounts/etc. change
 	const collection = useMemo(
 		() =>
 			createCollection(
 				queryCollectionOptions({
-					// eslint-disable-next-line @tanstack/query/exhaustive-deps -- Using subset of accounts to avoid unnecessary re-renders due to timestamp changes
-					queryKey: ['pim', 'eligibleRoles', accountsHash],
-					enabled: !eligibleRolesQuery.isLoading,
-					queryFn: async () => eligibleRolesQuery.data,
-					refetchInterval,
+					queryKey,
+					enabled: queryResults.every(q => q.isPending),
+					queryFn: async () => queries.flatMap(query => queryClient.getQueryData<RoleSchedule[]>(query.queryKey) ?? []),
 					queryClient,
 					getKey: role => role.id,
 				})
 			),
-		[accountsHash]
+		[queryClient, queryKey]
 	)
+
+	// Refresh the collection query if the roles changed
+	const lastDataUpdates = queryResults.map(result => result.dataUpdatedAt).join('|')
+	const isPending = queryResults.some(result => result.isPending)
+	useEffect(() => {
+		if (isPending) {
+			return
+		}
+		queryClient.refetchQueries({ queryKey })
+	}, [queryClient, queryKey, lastDataUpdates, isPending])
+
+	// Enable logging of collection changes for debugging
+	useEffect(() => {
+		const { unsubscribe } = collection.subscribeChanges(changes =>
+			changes.forEach(change => console.log(`🪧 EligibleRole ${change.type}: ${change.key}`))
+		)
+
+		return () => {
+			try {
+				unsubscribe()
+			} catch (err) {
+				throwIfNotError(err)
+				// Swallow emitInner errors that indicate collection was already disposed
+				if (!err.message.includes('emitInner')) {
+					throw err
+				}
+			}
+		}
+	}, [collection])
 
 	const liveQuery = useLiveQuery(collection)
 	return liveQuery
 }
 
-export function createQueryDefinitions(accounts: AccountInfo[]) {
+function createQueryDefinitions(accounts: AccountInfo[]) {
 	// NOTE: This is used to ensure the queries are returned in a stable order
 	const queries: UseQueryOptions<RoleSchedule[]>[] = []
 

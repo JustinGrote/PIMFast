@@ -45,6 +45,18 @@
   color: #888;
 }
 
+/* Speed up all MantineAgGridReact transitions */
+/* .mantineAgGrid {
+  --ag-transition-speed: 50ms;
+}
+
+.ag-row-animation {
+  transition-duration: var(--ag-transition-speed, 300ms);
+} */
+
+.ag-row-animation .ag-row {
+  transition: transform 0.1s, top 0.2s, background-color 0.2s, opacity 0.2s;
+}
 /* Remove trailing space after rows for AG Grid instances using domLayout="autoHeight" */
 /* .ag-grid-autoheight .ag-center-cols-container {
 	padding-bottom: 0 !important;

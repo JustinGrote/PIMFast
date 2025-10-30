@@ -1,28 +1,21 @@
-import { getAzurePortalUrl } from '@/api/azureResourceId'
-import { AzureResource } from '@/components/icons/AzureResource'
+import { throwError, throwIfNotError } from '@/api/util'
 import { RoleActivationForm } from '@/components/RoleActivationForm'
 import { useEligibleRoleLiveQuery } from '@/db/EligibleRole.db'
-import { getRoleScheduleAccount, setRoleScheduleAccount } from '@/model/EligibleRole'
-import { fromGraphSchedule, RoleSchedule } from '@/model/RoleSchedule'
+import { getRoleScheduleAccount } from '@/model/EligibleRole'
+import { RoleSchedule } from '@/model/RoleSchedule'
 import { useMsal } from '@azure/msal-react'
 import { Button, Group, Modal, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconClearAll, IconRefresh, IconSearch } from '@tabler/icons-react'
-import { EntraConnect, Groups, ManagementGroups, ResourceGroups, Subscriptions } from '@threeveloper/azure-react-icons'
+import { useQueryClient } from '@tanstack/react-query'
 import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { memo, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { match } from 'ts-pattern'
+import { memo, Suspense, useEffect, useMemo, useState } from 'react'
 import MantineAgGridReact from './MantineAgGridReact'
-import { useQueryClient } from '@tanstack/react-query'
-import RoleScope from './RoleScope'
-import { throwError } from '@/api/util'
 import ResolvedTenantName from './ResolvedTenantName'
-import { createCollection, useLiveQuery } from '@tanstack/react-db'
-import { getMyEntraRoleEligibilitySchedules } from '@/api/pimGraph'
-import { queryCollectionOptions } from '@tanstack/query-db-collection'
+import RoleScope from './RoleScope'
 
 dayjs.extend(durationPlugin)
 dayjs.extend(relativeTimePlugin)
@@ -231,26 +224,57 @@ function RoleTable() {
 		[accounts]
 	)
 
-	// Filter the eligible roles based on search query
-	const filteredRoles: RoleSchedule[] = (() => {
-		const base = [...eligibleRolesQuery.data]
-		if (!filterQuery) {
-			return base
-		}
-		const lowerQuery = filterQuery.toLowerCase()
-		return base.filter(role => {
-			const account = getRoleScheduleAccount(role)
-			const accountName = account?.name?.toLowerCase() || ''
-			const roleName = role.roleDefinitionDisplayName?.toLowerCase() || ''
-			const scopeName = role.scopeDisplayName?.toLowerCase() || ''
-			// TODO: Fix tenant search
+	// // Filter the eligible roles based on search query
+	// const filteredRoles: RoleSchedule[] = (() => {
+	// 	const base = [...eligibleRolesQuery.data]
+	// 	if (!filterQuery) {
+	// 		return base
+	// 	}
+	// 	const lowerQuery = filterQuery.toLowerCase()
+	// 	return base.filter(role => {
+	// 		const account = getRoleScheduleAccount(role)
+	// 		const accountName = account?.name?.toLowerCase() || ''
+	// 		const roleName = role.roleDefinitionDisplayName?.toLowerCase() || ''
+	// 		const scopeName = role.scopeDisplayName?.toLowerCase() || ''
+	// 		// TODO: Fix tenant search
 
-			return accountName.includes(lowerQuery) || roleName.includes(lowerQuery) || scopeName.includes(lowerQuery)
-		})
-	})()
+	// 		return accountName.includes(lowerQuery) || roleName.includes(lowerQuery) || scopeName.includes(lowerQuery)
+	// 	})
+	// })()
 
 	const onGridReady = (params: GridReadyEvent<RoleSchedule>) => {
 		setGridApi(params.api)
+
+		// Seed initial data so the grid has rows before live changes arrive
+		if (eligibleRolesQuery.data?.length) {
+			params.api.applyTransaction({ add: eligibleRolesQuery.data })
+		}
+
+		// Subscribe to live changes and apply them as transactions
+		const { unsubscribe } = eligibleRolesQuery.collection.subscribeChanges(changes => {
+			const add = changes.filter(change => change.type === 'insert').map(change => change.value)
+			const remove = changes.filter(change => change.type === 'delete').map(change => change.value)
+			const update = changes.filter(change => change.type === 'update').map(change => change.value)
+
+			const result = params.api.applyTransaction({ add, remove, update })
+			console.log(result)
+			params.api.refreshCells({ force: true })
+		})
+
+		// Ensure we clean up when the grid is torn down
+		params.api.addEventListener('gridPreDestroyed', () => {
+			if (typeof unsubscribe === 'function') {
+				try {
+					unsubscribe()
+				} catch (err) {
+					throwIfNotError(err)
+					// Swallow emitInner errors that indicate collection was already disposed
+					if (!err.message.includes('emitInner')) {
+						throw err
+					}
+				}
+			}
+		})
 	}
 
 	// /** Highlight roles that match the current resource in the active browser tab */
@@ -275,8 +299,13 @@ function RoleTable() {
 		gridApi?.resetQuickFilter()
 	}
 
+	// Keep the grid in sync with the search input
+	useEffect(() => {
+		gridApi?.setGridOption('quickFilterText', filterQuery)
+	}, [gridApi, filterQuery])
+
 	// Re-render grid when loading or rowData changes
-	const gridKey = `${eligibleRolesQuery.isLoading ? 'loading' : 'ready'}-${filteredRoles.map(r => r.id).join('|')}`
+	// const gridKey = `${eligibleRolesQuery.isLoading ? 'loading' : 'ready'}-${filteredRoles.map(r => r.id).join('|')}`
 
 	return (
 		<>
@@ -323,15 +352,17 @@ function RoleTable() {
 				/>
 
 				<MantineAgGridReact<RoleSchedule>
-					key={gridKey}
+					// key={gridKey} // Remove dynamic key to avoid remounting the grid
 					className="roleTable"
 					loading={eligibleRolesQuery.isLoading}
-					rowData={filteredRoles}
 					columnDefs={columnDefs}
 					getRowId={params => params.data.id}
 					onGridReady={onGridReady}
 					rowSelection={{ mode: 'singleRow', checkboxes: false }}
-					animateRows={false}
+					onRowDataUpdated={() => {
+						console.log('Row data updated, size columns to fit')
+					}}
+					animateRows={true}
 					defaultColDef={{
 						sortable: true,
 						filter: true,

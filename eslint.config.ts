@@ -41,7 +41,7 @@ export default defineConfig(
 	reactPlugin.configs.flat.recommended,
 	reactPlugin.configs.flat['jsx-runtime'],
 	reactHooks.configs['recommended-latest'],
-	reactRefresh.configs.vite,
+	reactRefresh.configs.next,
 	unusedImportsConfig,
 
 	// Custom Config

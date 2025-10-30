@@ -5,7 +5,6 @@ import { MantineProvider, createTheme } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { scan } from 'react-scan'
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 
@@ -25,7 +24,7 @@ const theme = createTheme({
 const queryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
-			staleTime: getMilliseconds(1, 'minutes'),
+			staleTime: getMilliseconds(5, 'seconds'),
 		},
 	},
 })
