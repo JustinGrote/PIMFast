@@ -6,16 +6,27 @@ import { setRoleScheduleAccount } from '@/model/EligibleRole'
 import { fromArmSchedule, fromGraphSchedule, fromGroupSchedule, RoleSchedule } from '@/model/RoleSchedule'
 import { AccountInfo } from '@azure/msal-browser'
 import { useMsal } from '@azure/msal-react'
-import { createCollection } from '@tanstack/db'
-import { queryCollectionOptions } from '@tanstack/query-db-collection'
+import { Collection, createCollection, NonSingleResult, UtilsRecord } from '@tanstack/react-db'
+import { queryCollectionOptions, QueryCollectionUtils } from '@tanstack/query-db-collection'
 import { useLiveQuery } from '@tanstack/react-db'
 import { useQueries, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
 const refetchInterval = getMilliseconds(5, 'seconds')
 
-// We singleton this at a module level so that the collection isn't recreated on every hook call but can reference updates in the query data from its function
-let queries: UseQueryOptions<RoleSchedule[], Error, RoleSchedule[], readonly unknown[]>[]
+// NOTE: ResultType does not work as expected
+type EligibleRoleCollection = Collection<
+	RoleSchedule,
+	string,
+	UtilsRecord & QueryCollectionUtils<RoleSchedule, string, RoleSchedule, unknown>,
+	never,
+	RoleSchedule
+> &
+	NonSingleResult
+
+// We singleton this at a module level so that the collection isn't recreated on every hook call but can reference updates in the query data from its function.
 const queryKey = ['pim', 'eligibleRoles']
+let collection: EligibleRoleCollection
+let queries: UseQueryOptions<RoleSchedule[], Error, RoleSchedule[], readonly unknown[]>[]
 
 export function useEligibleRoleLiveQuery(accountsHash: string) {
 	const queryClient = useQueryClient()
@@ -27,17 +38,13 @@ export function useEligibleRoleLiveQuery(accountsHash: string) {
 	queries = useMemo(() => createQueryDefinitions(accounts), [accounts, accountsHash])
 
 	// NOTE: This collection is effectively a singleton, it doesn't need recreating when accounts/etc. change
-	const collection = useMemo(
-		() =>
-			createCollection(
-				queryCollectionOptions({
-					queryKey,
-					queryFn: async () => queries.flatMap(query => queryClient.getQueryData<RoleSchedule[]>(query.queryKey) ?? []),
-					queryClient,
-					getKey: role => role.id,
-				})
-			),
-		[queryClient, queryKey]
+	collection ??= createCollection(
+		queryCollectionOptions({
+			queryKey,
+			queryFn: async () => queries.flatMap(query => queryClient.getQueryData<RoleSchedule[]>(query.queryKey) ?? []),
+			queryClient,
+			getKey: role => role.id,
+		})
 	)
 
 	// Refresh the collection query if data has been fetched or has changed
