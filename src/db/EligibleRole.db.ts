@@ -1,4 +1,3 @@
-import { ObjectMappingMetadataObject } from '@/api/generated/msgraph/models'
 import { getMyRoleEligibilitySchedules } from '@/api/pim'
 import { getMyEntraGroupEligibilitySchedules, getMyEntraRoleEligibilitySchedules } from '@/api/pimGraph'
 import { getMilliseconds } from '@/api/time'
@@ -11,19 +10,21 @@ import { createCollection } from '@tanstack/db'
 import { queryCollectionOptions } from '@tanstack/query-db-collection'
 import { useLiveQuery } from '@tanstack/react-db'
 import { useQueries, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 const refetchInterval = getMilliseconds(5, 'seconds')
+
+// We singleton this at a module level so that the collection isn't recreated on every hook call but can reference updates in the query data from its function
+let queries: UseQueryOptions<RoleSchedule[], Error, RoleSchedule[], readonly unknown[]>[]
+const queryKey = ['pim', 'eligibleRoles']
 
 export function useEligibleRoleLiveQuery(accountsHash: string) {
 	const queryClient = useQueryClient()
 	const { accounts } = useMsal()
-	const [queryKey] = useState(() => ['pim', 'eligibleRoles'])
 
 	// Clean up inactive eligible role queries
 	queryClient.removeQueries({ queryKey: ['pim'], type: 'inactive' })
 
-	const queries = useMemo(() => createQueryDefinitions(accounts), [accountsHash, accounts])
-	const queryResults = useQueries({ queries })
+	queries = useMemo(() => createQueryDefinitions(accounts), [accounts, accountsHash])
 
 	// NOTE: This collection is effectively a singleton, it doesn't need recreating when accounts/etc. change
 	const collection = useMemo(
@@ -31,7 +32,6 @@ export function useEligibleRoleLiveQuery(accountsHash: string) {
 			createCollection(
 				queryCollectionOptions({
 					queryKey,
-					enabled: queryResults.every(q => q.isPending),
 					queryFn: async () => queries.flatMap(query => queryClient.getQueryData<RoleSchedule[]>(query.queryKey) ?? []),
 					queryClient,
 					getKey: role => role.id,
@@ -40,15 +40,12 @@ export function useEligibleRoleLiveQuery(accountsHash: string) {
 		[queryClient, queryKey]
 	)
 
-	// Refresh the collection query if the roles changed
+	// Refresh the collection query if data has been fetched or has changed
+	const queryResults = useQueries({ queries })
 	const lastDataUpdates = queryResults.map(result => result.dataUpdatedAt).join('|')
-	const isPending = queryResults.some(result => result.isPending)
 	useEffect(() => {
-		if (isPending) {
-			return
-		}
 		queryClient.refetchQueries({ queryKey })
-	}, [queryClient, queryKey, lastDataUpdates, isPending])
+	}, [queryClient, lastDataUpdates])
 
 	// Enable logging of collection changes for debugging
 	useEffect(() => {

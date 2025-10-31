@@ -4,15 +4,27 @@ import { useEligibleRoleLiveQuery } from '@/db/EligibleRole.db'
 import { getRoleScheduleAccount } from '@/model/EligibleRole'
 import { RoleSchedule } from '@/model/RoleSchedule'
 import { useMsal } from '@azure/msal-react'
-import { Button, Group, Modal, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core'
+import {
+	ActionIcon,
+	Button,
+	Center,
+	Group,
+	Loader,
+	Modal,
+	Skeleton,
+	Stack,
+	Text,
+	TextInput,
+	Title,
+} from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { IconClearAll, IconRefresh, IconSearch } from '@tabler/icons-react'
+import { IconClearAll, IconClick, IconPlayerPlay, IconPlayerStop, IconRefresh, IconSearch } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ColDef, GridApi, GridReadyEvent } from 'ag-grid-community'
 import dayjs from 'dayjs'
 import durationPlugin from 'dayjs/plugin/duration'
 import relativeTimePlugin from 'dayjs/plugin/relativeTime'
-import { memo, Suspense, useEffect, useMemo, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import MantineAgGridReact from './MantineAgGridReact'
 import ResolvedTenantName from './ResolvedTenantName'
 import RoleScope from './RoleScope'
@@ -24,6 +36,7 @@ function RoleTable() {
 	const [isActivationModalOpened, { open: openActivationModal, close: closeActivationModal }] = useDisclosure(false)
 	const [selectedRole, setSelectedRole] = useState<RoleSchedule | null>(null)
 	const [gridApi, setGridApi] = useState<GridApi<RoleSchedule> | null>(null)
+	// Keep the search input controlled and in sync with AG Grid
 	const [filterQuery, setFilterQuery] = useState('')
 
 	const { accounts } = useMsal()
@@ -32,16 +45,36 @@ function RoleTable() {
 
 	const eligibleRolesQuery = useEligibleRoleLiveQuery(accountsHash)
 
-	// const {
-	// 	accountIds,
-	// 	eligibleRolesQuery,
-	// 	// roleStatusQuery,
-	// 	// deactivateEligibleRoleMutation,
-	// 	refresh,
-	// 	isEligibleRoleActivated,
-	// 	isEligibleRoleNewlyActivated,
-	// 	isEligibleRoleDeactivating,
-	// } = useRoleTableQueries()
+	// Helper function to get cached tenant display name for filtering
+	// TODO: Move this logic to ResolvedTenantName and deduplicate
+	const getCachedTenantDisplayName = useCallback(
+		(role: RoleSchedule): string => {
+			const account = getRoleScheduleAccount(role)
+			if (!account) return ''
+
+			try {
+				// Try to get cached tenant info from the query cache
+				const cachedTenantInfo = queryClient.getQueryData<
+					Record<string, { displayName?: string; defaultDomain?: string; tenantId?: string }>
+				>(['tenants', account.homeAccountId])
+
+				if (cachedTenantInfo) {
+					// For ARM roles, the tenant ID might be in the subscription
+					// For other roles, it's typically the account's tenant
+					const tenantId = account.tenantId
+					const tenant = cachedTenantInfo[tenantId]
+					if (tenant) {
+						return tenant.defaultDomain ?? tenant.displayName ?? tenantId
+					}
+				}
+			} catch {
+				// Ignore errors and fall back to tenant ID
+			}
+
+			return account.tenantId || ''
+		},
+		[queryClient]
+	)
 
 	// const handleActivateClick = useCallback(
 	// 	(eligibleRole: RoleSchedule) => {
@@ -141,6 +174,7 @@ function RoleTable() {
 				},
 			},
 			{
+				colId: 'tenant',
 				headerName: 'Tenant',
 				cellRenderer: (params: { data: RoleSchedule }) => {
 					return (
@@ -156,13 +190,14 @@ function RoleTable() {
 					)
 				},
 				flex: 1,
-				sortable: false,
+				sortable: true,
 				resizable: true,
+				getQuickFilterText: ({ data }) => getCachedTenantDisplayName(data),
 			},
 			// {
 			// 	headerName: 'Status',
 			// 	cellRenderer: renderStatusCell,
-			// 	width: 100,
+			// 	width: 100
 			// 	sortable: false,
 			// 	resizable: true,
 			// 	valueGetter: params => params.data?.endDateTime || '',
@@ -170,7 +205,7 @@ function RoleTable() {
 			// 	lockVisible: true,
 			// },
 			// {
-			// 	headerName: '',
+			// 	headerName: 'Actions',
 			// 	headerComponent: () => (
 			// 		<Center>
 			// 			<IconClick size={16} />
@@ -183,34 +218,33 @@ function RoleTable() {
 			// 					variant="subtle"
 			// 					disabled={isEligibleRoleNewlyActivated(params.data)}
 			// 					onClick={() => {
-			// 						handleActivateClick(params.data)
+			// 						// FIXME: Reimplement using collections
+			// 						// handleActivateClick(params.data)
 			// 					}}
 			// 					loaderProps={{
 			// 						color: 'blue',
 			// 					}}
 			// 				>
-			// 					<Skeleton visible={!roleStatusQuery.isSuccess}>
-			// 						{isEligibleRoleActivated(params.data) ? (
-			// 							isEligibleRoleDeactivating(params.data) ? (
-			// 								<Loader size="sm" />
-			// 							) : (
-			// 								<IconPlayerStop
-			// 									size="sm"
-			// 									color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
-			// 									title={
-			// 										isEligibleRoleNewlyActivated(params.data)
-			// 											? `Role must be active for at least 5 minutes before it can be disabled`
-			// 											: 'Deactivate Role'
-			// 									}
-			// 								/>
-			// 							)
+			// 					{isEligibleRoleActivated(params.data) ? (
+			// 						isEligibleRoleDeactivating(params.data) ? (
+			// 							<Loader size="sm" />
 			// 						) : (
-			// 							<IconPlayerPlay
-			// 								color="green"
-			// 								title="Activate Role"
+			// 							<IconPlayerStop
+			// 								size="sm"
+			// 								color={isEligibleRoleNewlyActivated(params.data) ? undefined : 'red'}
+			// 								title={
+			// 									isEligibleRoleNewlyActivated(params.data)
+			// 										? `Role must be active for at least 5 minutes before it can be disabled`
+			// 										: 'Deactivate Role'
+			// 								}
 			// 							/>
-			// 						)}
-			// 					</Skeleton>
+			// 						)
+			// 					) : (
+			// 						<IconPlayerPlay
+			// 							color="green"
+			// 							title="Activate Role"
+			// 						/>
+			// 					)}
 			// 				</ActionIcon>
 			// 			</Group>
 			// 		</div>
@@ -275,6 +309,10 @@ function RoleTable() {
 				}
 			}
 		})
+
+		if (filterQuery) {
+			params.api.setGridOption('quickFilterText', filterQuery)
+		}
 	}
 
 	// /** Highlight roles that match the current resource in the active browser tab */
@@ -296,16 +334,9 @@ function RoleTable() {
 
 	const resetView = () => {
 		gridApi?.resetColumnState()
-		gridApi?.resetQuickFilter()
+		gridApi?.setGridOption('quickFilterText', '')
+		setFilterQuery('')
 	}
-
-	// Keep the grid in sync with the search input
-	useEffect(() => {
-		gridApi?.setGridOption('quickFilterText', filterQuery)
-	}, [gridApi, filterQuery])
-
-	// Re-render grid when loading or rowData changes
-	// const gridKey = `${eligibleRolesQuery.isLoading ? 'loading' : 'ready'}-${filteredRoles.map(r => r.id).join('|')}`
 
 	return (
 		<>
@@ -347,7 +378,11 @@ function RoleTable() {
 					placeholder="Search roles, accounts, scopes, or tenants..."
 					leftSection={<IconSearch size={16} />}
 					value={filterQuery}
-					onChange={event => setFilterQuery(event.currentTarget.value)}
+					onChange={event => {
+						const value = event.currentTarget.value
+						setFilterQuery(value)
+						gridApi?.setGridOption('quickFilterText', value)
+					}}
 					mb="md"
 				/>
 
@@ -359,9 +394,6 @@ function RoleTable() {
 					getRowId={params => params.data.id}
 					onGridReady={onGridReady}
 					rowSelection={{ mode: 'singleRow', checkboxes: false }}
-					onRowDataUpdated={() => {
-						console.log('Row data updated, size columns to fit')
-					}}
 					animateRows={true}
 					defaultColDef={{
 						sortable: true,

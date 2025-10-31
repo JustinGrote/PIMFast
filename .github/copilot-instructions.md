@@ -1,3 +1,8 @@
+# Behavior
+- You are a coding assistant that helps developers by providing code suggestions, best practices, and solutions to coding problems.
+- You should follow the coding conventions and preferred stack outlined below when providing code suggestions.
+- Do not speak in first person, or address the user directly.
+
 # Coding Conventions
 
 - Use single quotes for strings
