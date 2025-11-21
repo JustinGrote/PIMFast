@@ -13,20 +13,13 @@ import { useQueries, useQueryClient, UseQueryOptions } from '@tanstack/react-que
 import { useEffect, useMemo } from 'react'
 const refetchInterval = getMilliseconds(5, 'seconds')
 
-// NOTE: ResultType does not work as expected
-type EligibleRoleCollection = Collection<
-	RoleSchedule,
-	string,
-	UtilsRecord & QueryCollectionUtils<RoleSchedule, string, RoleSchedule, unknown>,
-	never,
-	RoleSchedule
-> &
-	NonSingleResult
+// NOTE: ResultType does not work as expected so we manually defined this type
+type EligibleRoleCollection = Collection<RoleSchedule,string,UtilsRecord & QueryCollectionUtils<RoleSchedule, string, RoleSchedule, unknown>,never,RoleSchedule> & NonSingleResult
 
-// We singleton this at a module level so that the collection isn't recreated on every hook call but can reference updates in the query data from its function.
+// We singleton this at a module level so that the collection isn't recreated on every hook call but can reference updates in the query data from its queryFn since it is outside the closure.
 const queryKey = ['pim', 'eligibleRoles']
-let collection: EligibleRoleCollection
 let queries: UseQueryOptions<RoleSchedule[], Error, RoleSchedule[], readonly unknown[]>[]
+let collection: EligibleRoleCollection
 
 export function useEligibleRoleLiveQuery(accountsHash: string) {
 	const queryClient = useQueryClient()
@@ -71,7 +64,7 @@ export function useEligibleRoleLiveQuery(accountsHash: string) {
 				}
 			}
 		}
-	}, [collection])
+	}, [])
 
 	const liveQuery = useLiveQuery(collection)
 	return liveQuery

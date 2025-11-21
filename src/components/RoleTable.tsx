@@ -255,7 +255,7 @@ function RoleTable() {
 			// 	resizable: false,
 			// },
 		],
-		[accounts]
+		[accounts, getCachedTenantDisplayName]
 	)
 
 	// // Filter the eligible roles based on search query
@@ -292,7 +292,13 @@ function RoleTable() {
 
 			const result = params.api.applyTransaction({ add, remove, update })
 			console.log(result)
-			params.api.refreshCells({ force: true })
+			// Only refresh cells that were actually updated, not all cells with force: true
+			if (result && update.length > 0 && result.update && result.update.length > 0) {
+				params.api.refreshCells({ 
+					rowNodes: result.update,
+					force: false // Let AG Grid decide if refresh is needed
+				})
+			}
 		})
 
 		// Ensure we clean up when the grid is torn down

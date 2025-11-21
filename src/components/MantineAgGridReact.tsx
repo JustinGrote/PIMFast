@@ -19,7 +19,7 @@ ModuleRegistry.registerModules([AllCommunityModule])
  * A pre-themed AG Grid React component that automatically integrates with the current Mantine theme.
  * Switches between light and dark themes based on the Mantine color scheme.
  */
-export default function MantineAgGridReact<T>({ ...agGridProps }: AgGridReactProps<T>) {
+export default function MantineAgGridReact<T>({ className, ...agGridProps }: AgGridReactProps<T>) {
 	const currentColorScheme = useComputedColorScheme()
 
 	// Determine the AG Grid theme class based on the Mantine color scheme
@@ -28,16 +28,19 @@ export default function MantineAgGridReact<T>({ ...agGridProps }: AgGridReactPro
 		return currentColorScheme === 'light' ? baseTheme.withPart(colorSchemeLight) : baseTheme.withPart(colorSchemeDark)
 	}, [currentColorScheme])
 
-	// Merge default styling with user props
-	const defaultGridOptions = useMemo(
-		() => ({
-			...agGridProps,
-			theme: gridTheme,
-			className: `mantineAgGrid ${agGridProps.className || ''}`.trim(),
-			// Default to autoHeight so the grid size matches total row height unless caller overrides
-			domLayout: 'autoHeight' as DomLayoutType,
-		}),
-		[agGridProps, gridTheme]
+	// Merge class names
+	const mergedClassName = useMemo(
+		() => `mantineAgGrid ${className || ''}`.trim(),
+		[className]
 	)
-	return <AgGridReact {...defaultGridOptions} />
+
+	return (
+		<AgGridReact 
+			{...agGridProps}
+			theme={gridTheme}
+			className={mergedClassName}
+			// Default to autoHeight so the grid size matches total row height unless caller overrides
+			domLayout={agGridProps.domLayout ?? ('autoHeight' as DomLayoutType)}
+		/>
+	)
 }
